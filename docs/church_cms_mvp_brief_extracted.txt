@@ -1,0 +1,580 @@
+
+===== PAGE 1 =====
+Church Management System MVP Brief
+Church Management System
+MVP Scope and Build Brief
+A focused first version of the full church administration platform
+MVP Priority: build a stable, login-ready, database-backed system before adding
+advanced modules.
+Main Goal
+Create a working church administration platform where an admin can log in, view real dashboard
+data, and manage the core church operations needed for a first usable release.
+?
+Secure login and logout
+?
+Dashboard with real database statistics
+?
+People and member management
+?
+Families, groups, and events
+?
+Attendance recording
+?
+Contributions, tithes, offerings, and expenses
+?
+Basic reports
+?
+Users, roles, permissions, and audit logs
+Tech Stack
+?
+Next.js
+?
+TypeScript
+?
+PostgreSQL
+?
+Prisma ORM
+?
+TailwindCSS
+?
+Zod validation
+?
+bcrypt for password hashing
+?
+JWT or secure session authentication
+?
+Role-based access control
+?
+pnpm workspace monorepo
+Project Structure
+church-management-system/
+apps/
+web/              # Frontend Next.js app
+api/              # Backend Next.js API app
+packages/
+shared/           # Shared types, Zod schemas, constants
+docs/
+
+===== PAGE 2 =====
+Church Management System MVP Brief
+README.md
+.env.example
+Architecture Rules
+?
+The frontend must not access the database directly.
+?
+The backend is the only layer that uses Prisma.
+?
+The frontend must call backend API routes through a typed API client.
+?
+Use clean feature-based folders; do not put everything in one giant file.
+?
+Use validation, error handling, loading states, and empty states.
+?
+Use pagination, search, and filters for large lists.
+?
+Important create, update, delete, and finance actions must write to AuditLog.
+MVP Modules
+?
+Authentication
+?
+Dashboard
+?
+Users
+?
+Roles and Permissions
+?
+People
+?
+Members
+?
+Families
+?
+Groups
+?
+Events
+?
+Attendance
+?
+Finance
+?
+Reports
+?
+Settings
+?
+Audit Logs
+Deferred Modules
+?
+Media manager
+?
+Plugins
+?
+Advanced pastoral care
+?
+Advanced prayer request workflow
+?
+Advanced communications
+?
+SMS/email integrations
+?
+Advanced multi-branch switching
+?
+Full kiosk device management
+Frontend Pages
+/login
+/dashboard
+
+===== PAGE 3 =====
+Church Management System MVP Brief
+/people
+/members
+/families
+/groups
+/events
+/attendance
+/finance
+/finance/contributions
+/finance/expenses
+/reports
+/settings
+/admin/users
+/admin/roles
+/admin/audit-logs
+Backend API Groups
+/api/v1/auth
+/api/v1/dashboard
+/api/v1/users
+/api/v1/roles
+/api/v1/permissions
+/api/v1/people
+/api/v1/members
+/api/v1/families
+/api/v1/groups
+/api/v1/events
+/api/v1/attendance
+/api/v1/finance
+/api/v1/reports
+/api/v1/settings
+/api/v1/audit-logs
+UI Design Direction
+Use a premium dark SaaS dashboard style with a black/charcoal background and lime/emerald
+accents.
+Token
+Value
+Background
+#0B0D0F
+Surface
+#121417
+Card
+#181C20
+Card Hover
+#20252B
+Border
+#2A3036
+Text Primary
+#F8FAFC
+Text Secondary
+#A7B0BA
+Text Muted
+#6B7280
+Accent Lime
+#A3FF3D
+Accent Green
+#18D26E
+Dark Green
+#052E1A
+Danger
+#EF4444
+Warning
+#F59E0B
+Info
+#38BDF8
+Reusable Frontend Components
+?
+AppShell
+?
+Sidebar
+?
+Topbar
+
+===== PAGE 4 =====
+Church Management System MVP Brief
+?
+StatCard
+?
+DataTable
+?
+FormField
+?
+Modal
+?
+ConfirmDialog
+?
+Badge
+?
+Avatar
+?
+ChartCard
+?
+PageHeader
+?
+SearchInput
+?
+FilterBar
+?
+Pagination
+?
+EmptyState
+Dashboard MVP
+?
+Total members
+?
+Active members
+?
+New members this month
+?
+Attendance today
+?
+Total giving this month
+?
+Tithes
+?
+Offerings
+?
+Expenses
+?
+Net balance
+?
+Upcoming events
+?
+Recent activities
+?
+Member growth chart
+?
+Finance chart
+?
+Attendance chart
+Authentication MVP
+?
+Login with email and password
+?
+Password hashing
+?
+Session or JWT authentication
+?
+Protected routes
+?
+Logout
+?
+Current user endpoint
+?
+Role-based access checks
+?
+Seeded super admin account
+Default login seed:
+Email: admin@church.test
+Password: Password123!
+
+===== PAGE 5 =====
+Church Management System MVP Brief
+Default Roles
+?
+Super Admin
+?
+Church Admin
+?
+Pastor
+?
+Finance Officer
+?
+Attendance Officer
+?
+Group Leader
+?
+Member
+MVP Permissions
+?
+dashboard.read
+?
+people.read
+?
+people.create
+?
+people.update
+?
+people.archive
+?
+members.read
+?
+members.create
+?
+members.update
+?
+members.archive
+?
+families.manage
+?
+groups.manage
+?
+events.manage
+?
+attendance.manage
+?
+finance.read
+?
+finance.create
+?
+finance.update
+?
+finance.approve
+?
+reports.read
+?
+settings.update
+?
+users.manage
+?
+roles.manage
+?
+audit.read
+MVP Database Models
+?
+Church
+?
+Branch
+?
+User
+?
+Role
+?
+Permission
+
+===== PAGE 6 =====
+Church Management System MVP Brief
+?
+UserRole
+?
+RolePermission
+?
+Person
+?
+Member
+?
+Family
+?
+FamilyMember
+?
+Group
+?
+GroupMember
+?
+Event
+?
+AttendanceSession
+?
+AttendanceRecord
+?
+FinancialFund
+?
+Contribution
+?
+Expense
+?
+AuditLog
+?
+ActivityLog
+?
+Setting
+Finance Rules
+?
+Finance records must be protected by permissions.
+?
+Contributions and expenses must be audited.
+?
+Do not allow normal members to edit finance records.
+?
+Only Super Admin, Church Admin, or Finance Officer can manage finance.
+?
+Dashboard finance values must come from backend queries.
+Seed Data
+?
+One demo church
+?
+One main branch
+?
+Super admin user
+?
+Church admin user
+?
+Finance officer user
+?
+Attendance officer user
+?
+Sample people
+?
+Sample members
+?
+Sample families
+?
+Sample groups
+?
+Sample events
+?
+Sample attendance sessions
+?
+Sample attendance records
+?
+Sample contributions
+?
+Sample expenses
+?
+Sample audit logs
+
+===== PAGE 7 =====
+Church Management System MVP Brief
+Documentation
+?
+README.md
+?
+.env.example
+?
+docs/PRODUCT_REQUIREMENTS.md
+?
+docs/DATABASE_MODELS.md
+?
+docs/API_DOCUMENTATION.md
+?
+docs/UI_GUIDE.md
+?
+docs/DEVELOPMENT_GUIDE.md
+Development Phases
+Phase 1 - Setup
+?
+Monorepo
+?
+TypeScript
+?
+Tailwind
+?
+Prisma
+?
+PostgreSQL
+?
+Shared package
+?
+README
+?
+.env.example
+Phase 2 - Database
+?
+Prisma schema
+?
+Migration
+?
+Seed script
+Phase 3 - Auth and RBAC
+?
+Login
+?
+Logout
+?
+Current user
+?
+Protected routes
+?
+Roles and permissions
+Phase 4 - Dashboard UI
+?
+Dark green dashboard layout
+?
+Stat cards
+?
+Charts
+?
+Recent activity
+?
+Summary API
+
+===== PAGE 8 =====
+Church Management System MVP Brief
+Phase 5 - Core CRUD
+?
+People
+?
+Members
+?
+Families
+?
+Groups
+?
+Events
+Phase 6 - Attendance
+?
+Attendance sessions
+?
+Check-in records
+?
+Attendance reports
+Phase 7 - Finance
+?
+Contributions
+?
+Tithes
+?
+Offerings
+?
+Expenses
+?
+Basic finance reports
+?
+Audit logging
+Phase 8 - Polish
+?
+Loading states
+?
+Empty states
+?
+Error states
+?
+Pagination
+?
+Search
+?
+Filtering
+?
+Responsive layout
+?
+TypeScript checks
+?
+Build fixes
+MVP Acceptance Criteria
+?
+The app runs without TypeScript errors.
+?
+Login works and protected pages require authentication.
+?
+Dashboard loads real database data from backend summary endpoints.
+?
+People and members CRUD works.
+?
+Attendance can be recorded.
+?
+Contributions and expenses can be recorded.
+?
+Finance actions are audited.
+?
+Users and roles can be managed.
+?
+The UI follows the dark green premium dashboard style.
+
+===== PAGE 9 =====
+Church Management System MVP Brief
+?
+Seed data creates a usable demo system.
+?
+README setup instructions are clear.
+?
+The project can run with pnpm install, Prisma migration, seed, and dev commands.
+Important Instruction
+Build the MVP first. Do not attempt the full enterprise system immediately. Prioritize a stable
+working version over too many unfinished modules.

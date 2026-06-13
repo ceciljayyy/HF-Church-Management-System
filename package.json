@@ -1,0 +1,39 @@
+{
+  "name": "church-management-system",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @church/api --filter @church/web dev",
+    "dev:web": "pnpm --filter @church/web dev",
+    "dev:api": "pnpm --filter @church/api dev",
+
+    "build": "pnpm -r --filter @church/api --filter @church/web build",
+    "build:web": "pnpm --filter @church/web build",
+    "build:api": "pnpm --filter @church/api build",
+
+    "lint": "pnpm -r --filter @church/api --filter @church/web lint",
+    "lint:web": "pnpm --filter @church/web lint",
+    "lint:api": "pnpm --filter @church/api lint",
+
+    "typecheck": "pnpm -r --filter @church/api --filter @church/web typecheck",
+    "typecheck:web": "pnpm --filter @church/web typecheck",
+    "typecheck:api": "pnpm --filter @church/api typecheck",
+
+    "prisma:generate": "pnpm --filter @church/api prisma:generate",
+    "prisma:migrate": "pnpm --filter @church/api prisma:migrate",
+    "prisma:push": "pnpm --filter @church/api prisma:push",
+    "prisma:seed": "pnpm --filter @church/api prisma:seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.3",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3"
+  }
+}

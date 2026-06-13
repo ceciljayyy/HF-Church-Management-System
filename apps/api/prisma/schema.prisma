@@ -1,0 +1,555 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+  VISITOR
+}
+
+enum MembershipType {
+  BAPTIZED
+  UNBAPTIZED
+  TRANSFER
+  OTHER
+}
+
+enum GroupType {
+  MINISTRY
+  DEPARTMENT
+  CELL
+  SMALL_GROUP
+  OTHER
+}
+
+enum GroupStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum EventType {
+  SERVICE
+  MEETING
+  CONFERENCE
+  OUTREACH
+  YOUTH
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum AttendanceMode {
+  MANUAL
+  KIOSK
+  QR
+  SELF
+}
+
+enum AttendanceRecordStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum ContributionType {
+  TITHE
+  OFFERING
+  DONATION
+  SEED
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+model Church {
+  id        String   @id @default(cuid())
+  name      String
+  logoUrl   String?
+  email     String?  @unique
+  phone     String?
+  website   String?
+  address   String?
+  city      String?
+  country   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches Branch[]
+
+  @@index([name])
+}
+
+model Branch {
+  id           String   @id @default(cuid())
+  churchId     String
+  name         String
+  address      String?
+  phone        String?
+  email        String?
+  pastorName   String?
+  isMainBranch Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church             Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  users              User[]
+  people             Person[]
+  members            Member[]
+  families           Family[]
+  groups             Group[]
+  events             Event[]
+  attendanceSessions AttendanceSession[]
+  financialFunds     FinancialFund[]
+  contributions      Contribution[]
+  expenses           Expense[]
+  settings           Setting[]
+  auditLogs          AuditLog[]
+  activityLogs       ActivityLog[]
+
+  @@unique([churchId, name])
+  @@index([churchId])
+  @@index([name])
+}
+
+model User {
+  id           String     @id @default(cuid())
+  branchId     String
+  name         String
+  email        String     @unique
+  passwordHash String
+  avatarUrl    String?
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  branch                    Branch              @relation(fields: [branchId], references: [id])
+  roles                     UserRole[]
+  createdEvents             Event[]             @relation("EventCreatedBy")
+  attendanceSessionsCreated AttendanceSession[] @relation("AttendanceSessionCreatedBy")
+  attendanceCheckedIn       AttendanceRecord[]  @relation("AttendanceCheckedInBy")
+  contributionsReceived     Contribution[]      @relation("ContributionReceivedBy")
+  expensesRequested         Expense[]           @relation("ExpenseRequestedBy")
+  expensesApproved          Expense[]           @relation("ExpenseApprovedBy")
+  auditLogs                 AuditLog[]
+  activityLogs              ActivityLog[]
+
+  @@index([branchId])
+  @@index([status])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  key         String @unique
+  description String?
+  module      String
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model Person {
+  id              String    @id @default(cuid())
+  branchId        String
+  title           String?
+  firstName       String
+  middleName      String?
+  lastName        String
+  preferredName   String?
+  suffix          String?
+  gender          Gender?
+  dateOfBirth     DateTime?
+  hideAge         Boolean   @default(false)
+  phone           String?
+  homePhone       String?
+  mobilePhone     String?
+  workPhone       String?
+  email           String?   @unique
+  otherEmail      String?
+  address         String?
+  city            String?
+  occupation      String?
+  facebookUrl     String?
+  xUrl            String?
+  linkedinUrl     String?
+  classification  String?
+  familyRole      String?
+  friendDate      DateTime?
+  profilePhotoUrl String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  branch            Branch             @relation(fields: [branchId], references: [id])
+  member            Member?
+  familyMembers     FamilyMember[]
+  ledGroups         Group[]            @relation("GroupLeader")
+  groupMemberships  GroupMember[]
+  contributions     Contribution[]
+  attendanceRecords AttendanceRecord[]
+
+  @@index([branchId])
+  @@index([firstName, lastName])
+}
+
+model Member {
+  id                    String         @id @default(cuid())
+  branchId              String
+  personId              String         @unique
+  membershipNumber      String         @unique
+  status                MemberStatus   @default(ACTIVE)
+  joinedAt              DateTime?
+  membershipType        MembershipType @default(OTHER)
+  baptismStatus         String?
+  maritalStatus         String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  deletedAt             DateTime?
+
+  branch Branch @relation(fields: [branchId], references: [id])
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([branchId])
+  @@index([status])
+}
+
+model Family {
+  id           String    @id @default(cuid())
+  branchId     String
+  familyName   String
+  address      String?
+  primaryPhone String?
+  primaryEmail String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  branch  Branch         @relation(fields: [branchId], references: [id])
+  members FamilyMember[]
+
+  @@unique([branchId, familyName])
+  @@index([branchId])
+}
+
+model FamilyMember {
+  id             String  @id @default(cuid())
+  familyId       String
+  personId       String
+  relationship   String
+  isHeadOfFamily Boolean @default(false)
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, personId])
+  @@index([familyId])
+  @@index([personId])
+}
+
+model Group {
+  id          String      @id @default(cuid())
+  branchId    String
+  name        String
+  type        GroupType   @default(OTHER)
+  description String?
+  leaderId    String?
+  meetingDay  String?
+  meetingTime String?
+  location    String?
+  status      GroupStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  branch  Branch        @relation(fields: [branchId], references: [id])
+  leader  Person?       @relation("GroupLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  members GroupMember[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+  @@index([status])
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  personId String
+  role     String?
+  joinedAt DateTime @default(now())
+  status   String   @default("ACTIVE")
+
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, personId])
+  @@index([groupId])
+  @@index([personId])
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  branchId      String
+  title         String
+  description   String?
+  eventType     EventType   @default(OTHER)
+  startDateTime DateTime
+  endDateTime   DateTime
+  location      String?
+  capacity      Int?
+  status        EventStatus @default(DRAFT)
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+
+  branch    Branch              @relation(fields: [branchId], references: [id])
+  createdBy User?               @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  sessions  AttendanceSession[]
+
+  @@unique([branchId, title, startDateTime])
+  @@index([branchId])
+  @@index([status])
+}
+
+model AttendanceSession {
+  id          String         @id @default(cuid())
+  branchId    String
+  eventId     String?
+  title       String
+  sessionDate DateTime
+  checkInMode AttendanceMode @default(MANUAL)
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  branch    Branch             @relation(fields: [branchId], references: [id])
+  event     Event?             @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdBy User?              @relation("AttendanceSessionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  records   AttendanceRecord[]
+
+  @@unique([branchId, title, sessionDate])
+  @@index([branchId])
+  @@index([sessionDate])
+}
+
+model AttendanceRecord {
+  id            String                 @id @default(cuid())
+  sessionId     String
+  personId      String
+  status        AttendanceRecordStatus @default(PRESENT)
+  checkedInAt   DateTime               @default(now())
+  checkedInById String?
+  notes         String?
+
+  session     AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  person      Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  checkedInBy User?             @relation("AttendanceCheckedInBy", fields: [checkedInById], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, personId])
+  @@index([sessionId])
+  @@index([personId])
+}
+
+model FinancialFund {
+  id          String  @id @default(cuid())
+  branchId    String
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  branch        Branch         @relation(fields: [branchId], references: [id])
+  contributions Contribution[]
+
+  @@unique([branchId, name])
+  @@index([branchId])
+}
+
+model Contribution {
+  id               String           @id @default(cuid())
+  branchId         String
+  personId         String?
+  fundId           String?
+  type             ContributionType @default(OFFERING)
+  amount           Decimal          @db.Decimal(14, 2)
+  currency         String           @default("USD")
+  paymentMethod    PaymentMethod    @default(CASH)
+  reference        String?          @unique
+  contributionDate DateTime
+  receivedById     String?
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  branch     Branch         @relation(fields: [branchId], references: [id])
+  person     Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
+  fund       FinancialFund? @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  receivedBy User?          @relation("ContributionReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+
+  @@index([branchId])
+  @@index([type])
+  @@index([contributionDate])
+}
+
+model Expense {
+  id            String        @id @default(cuid())
+  branchId      String
+  category      String
+  title         String
+  description   String?
+  amount        Decimal       @db.Decimal(14, 2)
+  currency      String        @default("USD")
+  paymentMethod PaymentMethod @default(CASH)
+  expenseDate   DateTime
+  requestedById String?
+  approvedById  String?
+  status        ExpenseStatus @default(PENDING)
+  receiptUrl    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  branch      Branch @relation(fields: [branchId], references: [id])
+  requestedBy User?  @relation("ExpenseRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  approvedBy  User?  @relation("ExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([branchId, title, expenseDate])
+  @@index([branchId])
+  @@index([status])
+}
+
+model Setting {
+  id        String      @id @default(cuid())
+  branchId  String
+  key       String
+  value     Json
+  type      SettingType @default(STRING)
+  updatedAt DateTime    @updatedAt
+
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, key])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  branchId  String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  branch Branch @relation(fields: [branchId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([branchId])
+  @@index([entity, entityId])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  branchId    String
+  userId      String?
+  title       String
+  description String?
+  type        String
+  createdAt   DateTime @default(now())
+
+  branch Branch @relation(fields: [branchId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([branchId])
+}
