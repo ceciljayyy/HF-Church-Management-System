@@ -44,17 +44,37 @@ export async function GET(req: NextRequest) {
   const fundId = url.searchParams.get('fundId')?.trim();
   const status = url.searchParams.get('status')?.trim();
   const paymentMethod = url.searchParams.get('paymentMethod')?.trim();
+  const startDate = url.searchParams.get('startDate')?.trim();
+  const endDate = url.searchParams.get('endDate')?.trim();
+  const minAmount = url.searchParams.get('minAmount')?.trim();
+  const maxAmount = url.searchParams.get('maxAmount')?.trim();
 
   const where: any = { branchId: session.branchId, deletedAt: null };
   if (category) where.category = category;
   if (fundId) where.fundId = fundId;
   if (status) where.status = normalizeEnum(status, 'PENDING');
   if (paymentMethod) where.paymentMethod = normalizeEnum(paymentMethod, 'CASH');
+  if (startDate || endDate) {
+    where.expenseDate = {};
+    if (startDate) where.expenseDate.gte = normalizeDate(startDate);
+    if (endDate) {
+      const date = normalizeDate(endDate);
+      date.setHours(23, 59, 59, 999);
+      where.expenseDate.lte = date;
+    }
+  }
+  if (minAmount || maxAmount) {
+    where.amount = {};
+    if (minAmount) where.amount.gte = Number(minAmount);
+    if (maxAmount) where.amount.lte = Number(maxAmount);
+  }
   if (search) {
     where.OR = [
       { title: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
       { vendorName: { contains: search, mode: 'insensitive' } },
+      { requestedByName: { contains: search, mode: 'insensitive' } },
+      { requestedBy: { name: { contains: search, mode: 'insensitive' } } },
     ];
   }
 

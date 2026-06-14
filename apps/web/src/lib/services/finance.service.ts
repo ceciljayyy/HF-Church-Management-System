@@ -1,5 +1,29 @@
 import { apiClient } from '@/lib/api-client';
 
+export type ExpenseFilters = {
+  search?: string;
+  category?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  paymentMethod?: string;
+  fundId?: string;
+  minAmount?: string | number;
+  maxAmount?: string | number;
+  page?: string | number;
+  limit?: string | number;
+};
+
+function buildQuery(filters?: ExpenseFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      params.set(key, String(value));
+    }
+  });
+  return params.toString();
+}
+
 export const financeService = {
   getFinanceOverview: () => apiClient.request<any>('/finance/overview'),
   getFinanceHistory: () => apiClient.request<any>('/finance/history'),
@@ -7,7 +31,10 @@ export const financeService = {
   getWelfarePayments: () => apiClient.request<any>('/finance/welfare/payments'),
   recordWelfarePayment: (payload: Record<string, unknown>) =>
     apiClient.request<any>('/finance/welfare/payments', { method: 'POST', body: JSON.stringify(payload) }),
-  getExpenses: () => apiClient.request<any>('/finance/expenses?limit=100'),
+  getExpenses: (filters?: ExpenseFilters) => {
+    const query = buildQuery({ limit: 100, ...(filters ?? {}) });
+    return apiClient.request<any>(`/finance/expenses${query ? `?${query}` : ''}`);
+  },
   createExpense: (payload: Record<string, unknown>) =>
     apiClient.request<any>('/finance/expenses', { method: 'POST', body: JSON.stringify(payload) }),
   approveExpense: (id: string) =>

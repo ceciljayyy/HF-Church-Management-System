@@ -2,21 +2,23 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { CircleDollarSign, FileBarChart2, HandCoins, Plus, TrendingDown } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { CircleDollarSign, FileBarChart2, HandCoins, Plus, RotateCcw, SlidersHorizontal, TrendingDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FormField } from '@/components/ui/form-field';
 import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
 import { PeopleSelector } from '@/components/people/people-selector';
 import { StatCard } from '@/components/ui/stat-card';
+import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { ExpensesPageSkeleton, FinanceOverviewSkeleton, FundsPageSkeleton, WelfarePageSkeleton } from '@/components/skeletons/page-skeletons';
-import { financeService } from '@/lib/services/finance.service';
+import { financeService, type ExpenseFilters } from '@/lib/services/finance.service';
 import { formatCurrency } from '@/lib/utils';
 
 type FinanceMode = 'overview' | 'welfare' | 'expenses' | 'funds' | 'history';
-type ModalName = 'welfare' | 'expense' | 'fund-type' | 'fund-campaign' | 'fund-payment' | null;
+type ModalName = 'welfare' | 'expense' | 'expense-filter' | 'fund-type' | 'fund-campaign' | 'fund-payment' | null;
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
 const buttonClass = 'inline-flex items-center gap-2 rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen transition hover:bg-lime/90 disabled:opacity-60';
@@ -27,6 +29,7 @@ const paymentMethods = ['CASH', 'MOBILE_MONEY', 'BANK_TRANSFER', 'CARD', 'CHEQUE
 const paymentTypes = ['INITIAL_PAYMENT', 'MONTHLY_PAYMENT', 'ARREARS_PAYMENT', 'ADVANCE_PAYMENT'];
 const expenseCategories = ['Utilities', 'Rent', 'Equipment', 'Media', 'Welfare', 'Missions', 'Transport', 'Maintenance', 'Salaries', 'Honorarium', 'Outreach', 'Event Cost', 'Office Supplies', 'Other'];
 const fundStatuses = ['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'ARCHIVED'];
+const expenseStatuses = ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'PAID', 'CANCELLED'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => String(new Date().getMonth() + 1);
@@ -38,6 +41,10 @@ function label(value: string) {
 
 function money(value: unknown, currency = 'GHS') {
   return formatCurrency(Number(value ?? 0), currency);
+}
+
+function activeExpenseFilterCount(filters: ExpenseFilters) {
+  return Object.values(filters).filter((value) => value !== undefined && value !== null && String(value).trim() !== '').length;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -75,6 +82,18 @@ function ChartCard({ title, data, valueKey = 'value' }: { title: string; data: a
 
 export function FinancePage({ mode }: { mode: FinanceMode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialExpenseFilters = useMemo<ExpenseFilters>(() => ({
+    search: searchParams.get('search') ?? '',
+    category: searchParams.get('category') ?? '',
+    status: searchParams.get('status') ?? '',
+    startDate: searchParams.get('startDate') ?? '',
+    endDate: searchParams.get('endDate') ?? '',
+    paymentMethod: searchParams.get('paymentMethod') ?? '',
+    fundId: searchParams.get('fundId') ?? '',
+    minAmount: searchParams.get('minAmount') ?? '',
+    maxAmount: searchParams.get('maxAmount') ?? '',
+  }), [searchParams]);
   const [overview, setOverview] = useState<any>(null);
   const [welfare, setWelfare] = useState<any>({ summary: {}, members: [], payments: [] });
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -82,8 +101,10 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   const [funds, setFunds] = useState<any[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expensesLoading, setExpensesLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [expenseFilters, setExpenseFilters] = useState<ExpenseFilters>(initialExpenseFilters);
   const [modal, setModal] = useState<ModalName>(null);
   const [selectedFundType, setSelectedFundType] = useState<any>(null);
   const [selectedFund, setSelectedFund] = useState<any>(null);
@@ -95,7 +116,7 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
       const [overviewData, welfareData, expenseData, fundTypeData, fundData, historyData] = await Promise.all([
         financeService.getFinanceOverview(),
         financeService.getWelfareSummary(),
-        financeService.getExpenses(),
+        financeService.getExpenses(mode === 'expenses' ? expenseFilters : undefined),
         financeService.getFundTypes(),
         financeService.getFunds(),
         financeService.getFinanceHistory(),
@@ -127,6 +148,10 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   }, []);
 
   useEffect(() => {
+    setExpenseFilters(initialExpenseFilters);
+  }, [initialExpenseFilters]);
+
+  useEffect(() => {
     if (mode !== 'overview') return;
     const timer = window.setInterval(loadFinance, 8000);
     return () => window.clearInterval(timer);
@@ -145,8 +170,17 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
     },
     expenses: {
       title: 'Expenses',
-      subtitle: 'Manage expense requests, approvals, paid status, vendors, categories, and fund impact.',
-      actions: <button type="button" onClick={() => setModal('expense')} className={buttonClass}><Plus className="h-4 w-4" />Add Expense</button>,
+      subtitle: 'Track church spending, approvals, payments, and categories.',
+      actions: (
+        <>
+          <button type="button" onClick={() => setModal('expense-filter')} className="relative inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters{activeExpenseFilterCount(expenseFilters) ? ` (${activeExpenseFilterCount(expenseFilters)})` : ''}
+            {activeExpenseFilterCount(expenseFilters) ? <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-lime" /> : null}
+          </button>
+          <button type="button" onClick={() => setModal('expense')} className={buttonClass}><Plus className="h-4 w-4" />Add Expense</button>
+        </>
+      ),
     },
     funds: {
       title: 'Funds',
@@ -175,18 +209,82 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
 
       {mode === 'overview' ? <Overview overview={overview} welfare={welfare} funds={funds} history={history} /> : null}
       {mode === 'welfare' ? <WelfareView welfare={welfare} onMember={setMemberDetail} /> : null}
-      {mode === 'expenses' ? <ExpensesView expenses={expenses} overview={overview} onUpdated={afterMutation} /> : null}
+      {mode === 'expenses' ? (
+        <ExpensesView
+          expenses={expenses}
+          funds={funds}
+          filters={expenseFilters}
+          loading={expensesLoading}
+          onRemoveFilter={removeExpenseFilter}
+          onUpdated={afterMutation}
+        />
+      ) : null}
       {mode === 'funds' ? <FundsView funds={funds} overview={overview} fundTypes={fundTypes} onCreateType={() => setModal('fund-type')} onCreateFund={(type) => { setSelectedFundType(type); setModal('fund-campaign'); }} onRecordPayment={(fund) => { setSelectedFund(fund); setModal('fund-payment'); }} /> : null}
       {mode === 'history' ? <HistoryTable history={history} /> : null}
 
       <RecordWelfarePaymentModal open={modal === 'welfare'} members={welfare.members ?? []} onClose={() => setModal(null)} onSaved={() => afterMutation('Welfare payment recorded successfully.')} />
       <AddExpenseModal open={modal === 'expense'} onClose={() => setModal(null)} funds={funds} onSaved={() => afterMutation('Expense saved successfully.')} />
+      <ExpenseFilterModal open={modal === 'expense-filter'} filters={expenseFilters} funds={funds} onClose={() => setModal(null)} onChange={setExpenseFilters} onApply={async () => { await applyExpenseFilters(); setModal(null); }} onClear={async () => { await clearExpenseFilters(); setModal(null); }} />
       <CreateFundTypeModal open={modal === 'fund-type'} onClose={() => setModal(null)} onSaved={(item) => { setFundTypes((current) => [...current, item]); afterMutation('Fund type created successfully.'); }} />
       <CreateFundCampaignModal open={modal === 'fund-campaign'} onClose={() => { setModal(null); setSelectedFundType(null); }} fundTypes={fundTypes} selectedType={selectedFundType} onChooseType={setSelectedFundType} onCreateType={() => setModal('fund-type')} onSaved={() => afterMutation('Fund created successfully.')} />
       <RecordFundPaymentModal fund={selectedFund} onClose={() => setSelectedFund(null)} onSaved={() => afterMutation('Fund payment recorded successfully.')} />
       <MemberDetailModal member={memberDetail} payments={welfare.payments ?? []} onClose={() => setMemberDetail(null)} />
     </div>
   );
+
+  async function applyExpenseFilters(nextFilters = expenseFilters) {
+    setExpensesLoading(true);
+    setError('');
+    try {
+      const response = await financeService.getExpenses(nextFilters);
+      setExpenses(response.items ?? []);
+      syncExpenseFilterUrl(nextFilters);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to filter expenses.');
+    } finally {
+      setExpensesLoading(false);
+    }
+  }
+
+  async function clearExpenseFilters() {
+    const emptyFilters: ExpenseFilters = {
+      search: '',
+      category: '',
+      status: '',
+      startDate: '',
+      endDate: '',
+      paymentMethod: '',
+      fundId: '',
+      minAmount: '',
+      maxAmount: '',
+    };
+    setExpenseFilters(emptyFilters);
+    await applyExpenseFilters(emptyFilters);
+  }
+
+  function syncExpenseFilterUrl(filters: ExpenseFilters) {
+    if (mode !== 'expenses') return;
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        params.set(key, String(value));
+      }
+    });
+    const query = params.toString();
+    router.replace(query ? `/finance/expenses?${query}` : '/finance/expenses', { scroll: false });
+  }
+
+  async function removeExpenseFilter(key: keyof ExpenseFilters | 'dateRange') {
+    const nextFilters = { ...expenseFilters };
+    if (key === 'dateRange') {
+      nextFilters.startDate = '';
+      nextFilters.endDate = '';
+    } else {
+      nextFilters[key] = '';
+    }
+    setExpenseFilters(nextFilters);
+    await applyExpenseFilters(nextFilters);
+  }
 }
 
 function Overview({ overview, welfare, funds, history }: { overview: any; welfare: any; funds: any[]; history: any[] }) {
@@ -237,18 +335,154 @@ function WelfareView({ welfare, onMember }: { welfare: any; onMember: (member: a
   );
 }
 
-function ExpensesView({ expenses, overview, onUpdated }: { expenses: any[]; overview: any; onUpdated: (message: string) => void }) {
+function ExpensesView({
+  expenses,
+  funds,
+  filters,
+  loading,
+  onRemoveFilter,
+  onUpdated,
+}: {
+  expenses: any[];
+  funds: any[];
+  filters: ExpenseFilters;
+  loading: boolean;
+  onRemoveFilter: (key: keyof ExpenseFilters | 'dateRange') => void;
+  onUpdated: (message: string) => void;
+}) {
+  const filteredTotal = expenses.reduce((total, item) => total + Number(item.amount ?? 0), 0);
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Expenses This Month" value={money(overview?.totalExpensesThisMonth)} icon={<TrendingDown className="h-5 w-5" />} accent="danger" />
+        <StatCard label="Filtered Expense Total" value={money(filteredTotal)} icon={<TrendingDown className="h-5 w-5" />} accent="danger" />
+        <StatCard label="Filtered Expenses" value={expenses.length} icon={<FileBarChart2 className="h-5 w-5" />} accent="info" />
         <StatCard label="Pending Approval" value={expenses.filter((item) => item.status === 'PENDING').length} icon={<FileBarChart2 className="h-5 w-5" />} accent="warning" />
-        <StatCard label="Approved" value={expenses.filter((item) => item.status === 'APPROVED').length} icon={<FileBarChart2 className="h-5 w-5" />} accent="green" />
         <StatCard label="Paid" value={expenses.filter((item) => item.status === 'PAID').length} icon={<CircleDollarSign className="h-5 w-5" />} accent="lime" />
       </section>
-      <ExpensesTable expenses={expenses} onUpdated={onUpdated} />
+      <ExpenseFilterChips filters={filters} funds={funds} onRemove={onRemoveFilter} />
+      {loading ? <TableSkeleton rows={7} columns={9} showFilters={false} /> : <ExpensesTable expenses={expenses} onUpdated={onUpdated} />}
     </div>
   );
+}
+
+function ExpenseFilterModal({
+  open,
+  filters,
+  funds,
+  onClose,
+  onChange,
+  onApply,
+  onClear,
+}: {
+  open: boolean;
+  filters: ExpenseFilters;
+  funds: any[];
+  onClose: () => void;
+  onChange: (filters: ExpenseFilters) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  function update(key: keyof ExpenseFilters, value: string) {
+    onChange({ ...filters, [key]: value });
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onApply();
+  }
+
+  return (
+    <Modal open={open} title="Filter Expenses" subtitle="Narrow expenses by category, status, date, payment method, fund, or amount." onClose={onClose} className="max-w-3xl">
+      <form onSubmit={submit} className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Search">
+            <input className={inputClass} value={String(filters.search ?? '')} onChange={(event) => update('search', event.target.value)} placeholder="Search title, vendor, description, requested by" />
+          </FormField>
+          <FormField label="Category">
+            <select className={inputClass} value={String(filters.category ?? '')} onChange={(event) => update('category', event.target.value)}>
+              <option value="">All Categories</option>
+              {expenseCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Status">
+            <select className={inputClass} value={String(filters.status ?? '')} onChange={(event) => update('status', event.target.value)}>
+              <option value="">All Statuses</option>
+              {expenseStatuses.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Payment method">
+            <select className={inputClass} value={String(filters.paymentMethod ?? '')} onChange={(event) => update('paymentMethod', event.target.value)}>
+              <option value="">All Payment Methods</option>
+              {paymentMethods.map((method) => <option key={method} value={method}>{label(method)}</option>)}
+            </select>
+          </FormField>
+          <FormField label="Start date">
+            <input type="date" className={inputClass} value={String(filters.startDate ?? '')} onChange={(event) => update('startDate', event.target.value)} />
+          </FormField>
+          <FormField label="End date">
+            <input type="date" className={inputClass} value={String(filters.endDate ?? '')} onChange={(event) => update('endDate', event.target.value)} />
+          </FormField>
+          <FormField label="Fund / Campaign">
+            <select className={inputClass} value={String(filters.fundId ?? '')} onChange={(event) => update('fundId', event.target.value)}>
+              <option value="">All Funds</option>
+              {funds.map((fund) => <option key={fund.id} value={fund.id}>{fund.title ?? fund.name}</option>)}
+            </select>
+          </FormField>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Minimum amount">
+              <input type="number" min="0" step="0.01" className={inputClass} value={String(filters.minAmount ?? '')} onChange={(event) => update('minAmount', event.target.value)} placeholder="0.00" />
+            </FormField>
+            <FormField label="Maximum amount">
+              <input type="number" min="0" step="0.01" className={inputClass} value={String(filters.maxAmount ?? '')} onChange={(event) => update('maxAmount', event.target.value)} placeholder="0.00" />
+            </FormField>
+          </div>
+        </div>
+        <div className="sticky bottom-0 -mx-6 -mb-6 flex flex-col gap-3 border-t border-border bg-card p-6 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClear} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary">
+            <RotateCcw className="h-4 w-4" />
+            Clear Filters
+          </button>
+          <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen transition hover:bg-lime/90">
+            <SlidersHorizontal className="h-4 w-4" />
+            Apply Filters
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ExpenseFilterChips({ filters, funds, onRemove }: { filters: ExpenseFilters; funds: any[]; onRemove: (key: keyof ExpenseFilters | 'dateRange') => void }) {
+  const chips = expenseFilterChips(filters, funds);
+  if (!chips.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {chips.map((chip) => (
+        <span key={chip.key} className="inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1.5 text-xs font-semibold text-lime">
+          {chip.label}
+          <button type="button" onClick={() => onRemove(chip.key)} className="rounded-full px-1 text-lime/80 transition hover:bg-lime/20 hover:text-lime" aria-label={`Remove ${chip.label} filter`}>
+            x
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function expenseFilterChips(filters: ExpenseFilters, funds: any[]) {
+  const chips: Array<{ key: keyof ExpenseFilters | 'dateRange'; label: string }> = [];
+  if (filters.search) chips.push({ key: 'search', label: `Search: ${filters.search}` });
+  if (filters.category) chips.push({ key: 'category', label: String(filters.category) });
+  if (filters.status) chips.push({ key: 'status', label: label(String(filters.status)) });
+  if (filters.startDate || filters.endDate) chips.push({ key: 'dateRange', label: `${filters.startDate || 'Start'} - ${filters.endDate || 'End'}` });
+  if (filters.paymentMethod) chips.push({ key: 'paymentMethod', label: label(String(filters.paymentMethod)) });
+  if (filters.fundId) {
+    const fund = funds.find((item) => item.id === filters.fundId);
+    chips.push({ key: 'fundId', label: fund?.title ?? fund?.name ?? 'Fund' });
+  }
+  if (filters.minAmount) chips.push({ key: 'minAmount', label: `Min ${money(filters.minAmount)}` });
+  if (filters.maxAmount) chips.push({ key: 'maxAmount', label: `Max ${money(filters.maxAmount)}` });
+  return chips;
 }
 
 function FundsView({ funds, overview, fundTypes, onCreateType, onCreateFund, onRecordPayment }: { funds: any[]; overview: any; fundTypes: any[]; onCreateType: () => void; onCreateFund: (type: any) => void; onRecordPayment: (fund: any) => void }) {
@@ -319,6 +553,10 @@ function ExpensesTable({ expenses, onUpdated }: { expenses: any[]; onUpdated?: (
       {item.status === 'PENDING' ? <button type="button" className={dangerButtonClass} onClick={() => run('reject', item.id)}>Reject</button> : null}
     </div>,
   ]);
+  if (!rows.length) {
+    return <EmptyState title="No expenses found for the selected filters." description="Adjust the filters or clear them to show all expenses again." />;
+  }
+
   return <DataTable columns={['Date', 'Title', 'Category', 'Fund/Campaign', 'Amount', 'Requested By', 'Approved By', 'Status', 'Actions']} rows={rows} minWidthClass="min-w-[1120px]" />;
 }
 
