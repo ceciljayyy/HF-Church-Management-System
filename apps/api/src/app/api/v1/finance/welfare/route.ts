@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'asc' },
       }),
       prisma.contribution.findMany({
-        where: { branchId: session.branchId, type: 'WELFARE', deletedAt: null },
+        where: { branchId: session.branchId, type: 'OTHER', notes: { contains: 'financeKind=WELFARE' }, deletedAt: null },
         include: { person: true, receivedBy: true },
         orderBy: { contributionDate: 'desc' },
       }),

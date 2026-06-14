@@ -19,7 +19,7 @@ export default function KioskPage() {
       <section className="grid gap-4 md:grid-cols-3">
         <StatCard label="Checked in" value={356} icon={<MonitorCheck className="h-5 w-5" />} />
         <StatCard label="First timers" value={24} icon={<UserCheck className="h-5 w-5" />} accent="green" />
-        <StatCard label="Expected members" value={2450} icon={<Users className="h-5 w-5" />} accent="info" />
+        <StatCard label="Expected people" value={2450} icon={<Users className="h-5 w-5" />} accent="info" />
       </section>
       <DataTable columns={['Name', 'Group', 'Time', 'Status']} rows={rows} />
     </div>

@@ -9,6 +9,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { FormField } from '@/components/ui/form-field';
 import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
+import { PeopleSelector } from '@/components/people/people-selector';
 import { StatCard } from '@/components/ui/stat-card';
 import { financeService } from '@/lib/services/finance.service';
 import { formatCurrency } from '@/lib/utils';
@@ -367,7 +368,7 @@ function HistoryTable({ history, compact = false }: { history: any[]; compact?: 
 }
 
 function RecordWelfarePaymentModal({ open, onClose, onSaved, members }: { open: boolean; onClose: () => void; onSaved: () => void; members: any[] }) {
-  const [form, setForm] = useState({ memberId: '', paymentType: 'MONTHLY_PAYMENT', month: currentMonth(), year: currentYear(), amount: '5', paymentMethod: 'CASH', paymentReference: '', paymentDate: today(), receivedBy: '', note: '' });
+  const [form, setForm] = useState({ memberId: '', memberName: '', paymentType: 'MONTHLY_PAYMENT', month: currentMonth(), year: currentYear(), amount: '5', paymentMethod: 'CASH', paymentReference: '', paymentDate: today(), receivedBy: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -397,7 +398,15 @@ function RecordWelfarePaymentModal({ open, onClose, onSaved, members }: { open: 
       <FinanceFormError error={error} />
       <form className="mt-4 space-y-5" onSubmit={submit}>
         <div className="grid gap-4 md:grid-cols-2">
-          <SelectField labelText="Member" value={form.memberId} options={members.map((member) => ({ label: `${member.memberName} (${member.memberId ?? '-'})`, value: member.id }))} onChange={(value) => setForm({ ...form, memberId: value })} />
+          <FormField label="Member">
+            <PeopleSelector
+              value={form.memberId}
+              includeMembersOnly
+              returnTo="/finance/welfare"
+              placeholder="Search members by name, phone, or membership number"
+              onChange={(person) => setForm({ ...form, memberId: person?.personId ?? '', memberName: person?.fullName ?? '' })}
+            />
+          </FormField>
           <SelectField labelText="Payment Type" value={form.paymentType} options={paymentTypes} onChange={(value) => setForm({ ...form, paymentType: value })} />
           <FormField label="Month"><input className={inputClass} type="number" min="1" max="12" value={form.month} onChange={(event) => setForm({ ...form, month: event.target.value })} /></FormField>
           <FormField label="Year"><input className={inputClass} type="number" min="2000" value={form.year} onChange={(event) => setForm({ ...form, year: event.target.value })} /></FormField>
@@ -571,7 +580,7 @@ function CreateFundCampaignModal({ open, onClose, onSaved, fundTypes, selectedTy
 }
 
 function RecordFundPaymentModal({ fund, onClose, onSaved }: { fund: any | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ contributorName: '', amount: '', currency: 'GHS', paymentMethod: 'CASH', paymentReference: '', paymentDate: today(), receivedBy: '', note: '' });
+  const [form, setForm] = useState({ contributorId: '', contributorName: '', amount: '', currency: 'GHS', paymentMethod: 'CASH', paymentReference: '', paymentDate: today(), receivedBy: '', note: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -592,7 +601,15 @@ function RecordFundPaymentModal({ fund, onClose, onSaved }: { fund: any | null; 
     <Modal open={Boolean(fund)} title="Record Fund Payment" subtitle={fund ? fund.title ?? fund.name : undefined} onClose={onClose}>
       <FinanceFormError error={error} />
       <form className="mt-4 space-y-4" onSubmit={submit}>
-        <FormField label="Contributor"><input className={inputClass} value={form.contributorName} onChange={(event) => setForm({ ...form, contributorName: event.target.value })} /></FormField>
+        <FormField label="Contributor">
+          <PeopleSelector
+            value={form.contributorId}
+            returnTo="/finance/funds"
+            placeholder="Search people or members"
+            onChange={(person) => setForm({ ...form, contributorId: person?.personId ?? '', contributorName: person?.fullName ?? '' })}
+          />
+        </FormField>
+        <FormField label="External Contributor Name"><input className={inputClass} value={form.contributorName} onChange={(event) => setForm({ ...form, contributorId: '', contributorName: event.target.value })} /></FormField>
         <FormField label="Amount"><input className={inputClass} type="number" min="0" step="0.01" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></FormField>
         <SelectField labelText="Payment Method" value={form.paymentMethod} options={paymentMethods} onChange={(value) => setForm({ ...form, paymentMethod: value })} />
         <FormField label="Payment Reference"><input className={inputClass} value={form.paymentReference} onChange={(event) => setForm({ ...form, paymentReference: event.target.value })} /></FormField>

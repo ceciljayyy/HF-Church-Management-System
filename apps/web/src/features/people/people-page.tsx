@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Archive, Download, Eye, FileUp, MoreVertical, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { SearchInput } from '@/components/ui/search-input';
@@ -40,16 +41,21 @@ function statusBadge(person: PersonRecord) {
 export function PeoplePageClient({
   initialData,
   permissions,
+  openAddUser = false,
+  returnTo,
 }: {
   initialData: PeopleListResponse;
   permissions: string[];
+  openAddUser?: boolean;
+  returnTo?: string;
 }) {
+  const router = useRouter();
   const [data, setData] = useState(initialData);
   const [page, setPage] = useState(initialData.pagination?.page ?? 1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [classification, setClassification] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(openAddUser);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<PersonRecord | null>(null);
   const [editingPerson, setEditingPerson] = useState<PersonRecord | null>(null);
@@ -189,7 +195,7 @@ export function PeoplePageClient({
     <div className="space-y-6">
       <PageHeader
         title="People Directory"
-        subtitle="Manage all people, visitors, contacts, and members from one searchable church directory."
+        subtitle="Manage all people, visitors, contacts, and ministry records from one searchable church directory."
         actions={
           <>
             {canImport ? (
@@ -291,7 +297,14 @@ export function PeoplePageClient({
         </div>
       </div>
 
-      <AddPersonDialog open={addOpen} onClose={() => setAddOpen(false)} onCreated={() => loadPeople()} />
+      <AddPersonDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={async () => {
+          await loadPeople();
+          if (returnTo) router.push(returnTo);
+        }}
+      />
       <ImportPeopleDialog open={importOpen} onClose={() => setImportOpen(false)} onImported={() => loadPeople()} />
       {editingPerson ? (
         <EditPersonDialog

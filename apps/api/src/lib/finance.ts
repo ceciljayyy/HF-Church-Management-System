@@ -62,7 +62,7 @@ export async function getFinanceOverview(branchId?: string | null) {
     }),
     prisma.contribution.aggregate({
       _sum: { amount: true },
-      where: { ...branchFilter, deletedAt: null, type: 'WELFARE', contributionDate: { gte: startOfMonth } },
+      where: { ...branchFilter, deletedAt: null, type: 'OTHER', notes: { contains: 'financeKind=WELFARE' }, contributionDate: { gte: startOfMonth } },
     }),
     prisma.contribution.aggregate({
       _sum: { amount: true },
@@ -108,7 +108,7 @@ export async function getFinanceOverview(branchId?: string | null) {
     prisma.activityLog.findMany({ where: { ...branchFilter, type: { startsWith: 'FINANCE' } }, take: 12, orderBy: { createdAt: 'desc' } }),
     prisma.contribution.findMany({
       where: { ...branchFilter, deletedAt: null, contributionDate: { gte: startWindow } },
-      select: { contributionDate: true, amount: true, type: true, fund: { select: { name: true } } },
+      select: { contributionDate: true, amount: true, type: true, notes: true, fund: { select: { name: true } } },
     }),
     prisma.expense.findMany({
       where: { ...branchFilter, deletedAt: null, expenseDate: { gte: startWindow } },
@@ -179,7 +179,7 @@ export async function getFinanceOverview(branchId?: string | null) {
     return {
       name: monthLabel(month),
       value: contributionHistory
-        .filter((item) => item.type === 'WELFARE' && monthKey(item.contributionDate) === key)
+        .filter((item) => item.notes?.includes('financeKind=WELFARE') && monthKey(item.contributionDate) === key)
         .reduce((total, item) => total + toNumber(item.amount), 0),
     };
   });

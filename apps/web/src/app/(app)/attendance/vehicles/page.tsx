@@ -1,5 +1,5 @@
 import { AttendancePage } from '@/features/attendance/attendance-page';
 
 export default function Page() {
-  return <AttendancePage mode="overview" />;
+  return <AttendancePage mode="vehicles" />;
 }

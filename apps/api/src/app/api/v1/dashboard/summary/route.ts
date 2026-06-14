@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { getFinanceOverview } from '@/lib/finance';
+import { buildAttendanceOverview } from '@/lib/attendance';
 
 export async function GET(_req: NextRequest) {
   try {
@@ -17,15 +18,16 @@ export async function GET(_req: NextRequest) {
     const startWindow = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
     const [
-      membersTotal,
-      activeMembers,
-      newMembersThisMonth,
+      peopleTotal,
+      activePeople,
+      newPeopleThisMonth,
       attendanceToday,
       financeOverview,
+      attendanceOverview,
     ] = await Promise.all([
-      prisma.member.count({ where: branchFilter }),
-      prisma.member.count({ where: { ...branchFilter, status: 'ACTIVE' } }),
-      prisma.member.count({ where: { ...branchFilter, createdAt: { gte: startOfMonth } } }),
+      prisma.person.count({ where: { ...branchFilter, deletedAt: null } }),
+      prisma.person.count({ where: { ...branchFilter, deletedAt: null } }),
+      prisma.person.count({ where: { ...branchFilter, deletedAt: null, createdAt: { gte: startOfMonth } } }),
       prisma.attendanceRecord.count({
         where: {
           checkedInAt: { gte: startOfToday },
@@ -33,6 +35,7 @@ export async function GET(_req: NextRequest) {
         },
       }),
       getFinanceOverview(session.branchId),
+      buildAttendanceOverview(session.branchId),
     ]);
 
     const expensesValue = financeOverview.expenses;
@@ -43,10 +46,10 @@ export async function GET(_req: NextRequest) {
     });
 
     const [
-      memberHistory,
+      peopleHistory,
       attendanceHistory,
     ] = await Promise.all([
-      prisma.member.findMany({ where: { ...branchFilter, createdAt: { gte: startWindow } }, select: { createdAt: true } }),
+      prisma.person.findMany({ where: { ...branchFilter, deletedAt: null, createdAt: { gte: startWindow } }, select: { createdAt: true } }),
       prisma.attendanceRecord.findMany({
         where: {
           checkedInAt: { gte: startWindow },
@@ -61,11 +64,11 @@ export async function GET(_req: NextRequest) {
     const monthLabel = (date: Date) =>
       date.toLocaleString('en-US', { month: 'short' });
 
-    const memberGrowthSeries = months.map((month) => {
+    const peopleGrowthSeries = months.map((month) => {
       const key = monthKey(month);
       return {
         name: monthLabel(month),
-        value: memberHistory.filter((item) => monthKey(item.createdAt) === key)
+        value: peopleHistory.filter((item) => monthKey(item.createdAt) === key)
           .length,
       };
     });
@@ -81,10 +84,14 @@ export async function GET(_req: NextRequest) {
     });
 
     return success({
-      membersTotal,
-      activeMembers,
-      newMembersThisMonth,
+      peopleTotal,
+      activePeople,
+      newPeopleThisMonth,
       attendanceToday,
+      latestPeopleAttendance: attendanceOverview.peopleAttendanceToday,
+      mainServiceAttendance: attendanceOverview.cards.main.latestTotal,
+      childrenServiceAttendance: attendanceOverview.cards.children.latestTotal,
+      vehiclesCount: attendanceOverview.vehiclesToday,
       welfareCollectedThisMonth: financeOverview.totalWelfareCollectedThisMonth,
       welfareArrears: financeOverview.welfareArrears,
       fundContributionsThisMonth: financeOverview.fundContributionsThisMonth,
@@ -94,7 +101,7 @@ export async function GET(_req: NextRequest) {
       pendingExpenseApprovals: financeOverview.pendingExpenseApprovals,
       activeFundCampaigns: financeOverview.activeFunds,
       fundsAvailable: financeOverview.fundsAvailable,
-      memberGrowthSeries,
+      peopleGrowthSeries,
       attendanceSeries,
       financeSeries: financeOverview.financeSeries,
       givingByType: financeOverview.givingByType,

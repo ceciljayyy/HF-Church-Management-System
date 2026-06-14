@@ -95,14 +95,14 @@ export default function LoginPage() {
             </h1>
 
             <p className="max-w-lg text-sm leading-6 text-secondary md:text-base">
-              Manage members, families, groups, events, attendance, finance,
+              Manage people, families, groups, events, attendance, finance,
               reports, and admin controls with a premium dark dashboard built
               for real church administration.
             </p>
           </div>
 
           <div className="relative z-10 grid gap-4 sm:grid-cols-3">
-            {['Members', 'Attendance', 'Finance'].map((item) => (
+            {['People', 'Attendance', 'Finance'].map((item) => (
               <div key={item} className="rounded-2xl border border-border bg-card/80 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-secondary">
                   {item}

@@ -23,19 +23,19 @@ const greenColor = 'rgb(var(--color-green))';
 const dangerColor = 'rgb(var(--color-danger))';
 
 export function DashboardCharts({
-  memberGrowthSeries,
+  peopleGrowthSeries,
   attendanceSeries,
   financeSeries,
 }: {
-  memberGrowthSeries: Array<{ name: string; value: number }>;
+  peopleGrowthSeries: Array<{ name: string; value: number }>;
   attendanceSeries: Array<{ name: string; value: number }>;
   financeSeries: Array<{ name: string; giving: number; expenses: number }>;
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-3">
-      <Card title="Member growth">
+      <Card title="People growth">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={memberGrowthSeries}>
+          <LineChart data={peopleGrowthSeries}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
             <XAxis dataKey="name" stroke={mutedColor} tick={axisStyle} />
             <YAxis stroke={mutedColor} tick={axisStyle} />

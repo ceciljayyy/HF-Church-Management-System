@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const receiptNumber = makeNumber('RCT');
     const paymentMethod = normalizeEnum(body.paymentMethod, 'CASH') as any;
     const memberName = `${person.firstName ?? ''} ${person.lastName ?? ''}`.trim() || person.preferredName || 'Member';
-    const noteParts = [`paymentType=${normalizeEnum(body.paymentType, 'MONTHLY_PAYMENT')}`, `month=${body.month}`, `year=${body.year}`];
+    const noteParts = ['financeKind=WELFARE', `paymentType=${normalizeEnum(body.paymentType, 'MONTHLY_PAYMENT')}`, `month=${body.month}`, `year=${body.year}`];
     if (body.note) noteParts.push(body.note);
 
     const item = await prisma.contribution.create({
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         personId: person.id,
         contributorName: memberName,
         isAnonymous: false,
-        type: 'WELFARE',
+        type: 'OTHER',
         amount: body.amount,
         currency: body.currency || 'GHS',
         paymentMethod,

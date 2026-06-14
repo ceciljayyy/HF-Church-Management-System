@@ -19,14 +19,19 @@ export function DashboardView({ summary }: { summary: any }) {
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total members" value={summary.membersTotal ?? 0} icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Active members" value={summary.activeMembers ?? 0} icon={<HeartPulse className="h-5 w-5" />} accent="green" />
-        <StatCard label="Attendance today" value={summary.attendanceToday ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="info" />
+        <StatCard label="Total people" value={summary.peopleTotal ?? 0} icon={<Users className="h-5 w-5" />} />
+        <StatCard label="New people this month" value={summary.newPeopleThisMonth ?? 0} icon={<UserPlus className="h-5 w-5" />} accent="green" />
+        <StatCard label="Total attendance today" value={summary.latestPeopleAttendance ?? summary.attendanceToday ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="info" />
         <StatCard label="Net balance" value={formatCurrency(summary.netBalance ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="warning" />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="New members this month" value={summary.newMembersThisMonth ?? 0} icon={<UserPlus className="h-5 w-5" />} accent="green" />
+        <StatCard label="Main service attendance" value={summary.mainServiceAttendance ?? 0} icon={<Users className="h-5 w-5" />} accent="green" />
+        <StatCard label="Children service attendance" value={summary.childrenServiceAttendance ?? 0} icon={<HeartPulse className="h-5 w-5" />} accent="info" />
+        <StatCard label="Vehicles count" value={summary.vehiclesCount ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="warning" />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Welfare collected this month" value={formatCurrency(summary.welfareCollectedThisMonth ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="lime" />
         <StatCard label="Welfare arrears" value={formatCurrency(summary.welfareArrears ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="warning" />
         <StatCard label="Expenses this month" value={formatCurrency(summary.expenses ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="danger" />
@@ -39,7 +44,7 @@ export function DashboardView({ summary }: { summary: any }) {
       </section>
 
       <DashboardCharts
-        memberGrowthSeries={summary.memberGrowthSeries ?? []}
+        peopleGrowthSeries={summary.peopleGrowthSeries ?? []}
         attendanceSeries={summary.attendanceSeries ?? []}
         financeSeries={summary.financeSeries ?? []}
       />

@@ -253,9 +253,9 @@ export const expenseSchema = z.object({
 });
 
 export const dashboardSummarySchema = z.object({
-  membersTotal: z.number().int(),
-  activeMembers: z.number().int(),
-  newMembersThisMonth: z.number().int(),
+  peopleTotal: z.number().int(),
+  activePeople: z.number().int(),
+  newPeopleThisMonth: z.number().int(),
   attendanceToday: z.number().int(),
   totalGivingThisMonth: z.number(),
   tithes: z.number(),
