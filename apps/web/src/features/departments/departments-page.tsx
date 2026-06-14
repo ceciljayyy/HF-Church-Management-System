@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
+import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
 import type { DepartmentRecord, Paginated } from './department-types';
 
@@ -119,9 +120,9 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
 
       {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
       {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {loading ? <div className="rounded-lg border border-border bg-card px-4 py-6 text-sm text-secondary">Loading departments...</div> : null}
-
-      {rows.length ? (
+      {loading ? (
+        <TableSkeleton rows={6} columns={7} showFilters={false} />
+      ) : rows.length ? (
         <DataTable columns={['Department', 'Head Position', 'Head of Department', 'Members', 'Status', 'Last Updated', 'Actions']} rows={rows} minWidthClass="min-w-[1040px]" />
       ) : (
         <EmptyState title="No departments yet" description="Create a department to start assigning leaders, positions, and members." />

@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
 import { PeopleSelector } from '@/components/people/people-selector';
 import { StatCard } from '@/components/ui/stat-card';
+import { ExpensesPageSkeleton, FinanceOverviewSkeleton, FundsPageSkeleton, WelfarePageSkeleton } from '@/components/skeletons/page-skeletons';
 import { financeService } from '@/lib/services/finance.service';
 import { formatCurrency } from '@/lib/utils';
 
@@ -160,7 +161,10 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   }[mode];
 
   if (loading) {
-    return <div className="rounded-lg border border-border bg-card p-6 text-sm text-secondary">Loading finance data...</div>;
+    if (mode === 'welfare') return <WelfarePageSkeleton />;
+    if (mode === 'expenses') return <ExpensesPageSkeleton />;
+    if (mode === 'funds') return <FundsPageSkeleton />;
+    return <FinanceOverviewSkeleton />;
   }
 
   return (

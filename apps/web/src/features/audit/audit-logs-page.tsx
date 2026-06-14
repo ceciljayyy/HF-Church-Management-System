@@ -5,6 +5,7 @@ import { RotateCcw, Search, X } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
+import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 
 type AuditLog = {
   id: string;
@@ -112,7 +113,7 @@ export function AuditLogsPageClient() {
       <section className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-primary">System Activity</h3>
-          <Badge>{loading ? 'Loading' : `${logs.length} records`}</Badge>
+          <Badge>{`${logs.length} records`}</Badge>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border text-left text-sm">
@@ -127,7 +128,14 @@ export function AuditLogsPageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {logs.map((log) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-0">
+                    <TableSkeleton rows={6} columns={6} showFilters={false} />
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && logs.map((log) => (
                 <tr key={log.id} className="text-secondary transition hover:bg-hover">
                   <td className="whitespace-nowrap px-4 py-3">{new Date(log.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3">

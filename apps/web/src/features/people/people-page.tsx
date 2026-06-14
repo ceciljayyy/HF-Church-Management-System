@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
+import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
 import { AddPersonDialog } from './add-person-dialog';
 import { ImportPeopleDialog } from './import-people-dialog';
@@ -262,9 +263,9 @@ export function PeoplePageClient({
       </form>
 
       {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {loading ? <div className="rounded-lg border border-border bg-card px-4 py-6 text-sm text-secondary">Loading people...</div> : null}
-
-      {rows.length ? (
+      {loading ? (
+        <TableSkeleton rows={7} columns={8} avatarColumn={true} showFilters={false} />
+      ) : rows.length ? (
         <DataTable
           columns={['Name', 'Email', 'Phone', 'Classification', 'Family', 'Status', 'Created At', 'Actions']}
           rows={rows}

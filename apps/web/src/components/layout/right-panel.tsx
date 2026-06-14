@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { DashboardRightPanelSkeleton } from '@/components/skeletons/dashboard-skeleton';
 import { apiClient } from '@/lib/api-client';
 
 type ActivityItem = {
@@ -29,6 +30,7 @@ function titleFor(item: ActivityItem) {
 
 export function RightPanel() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -39,6 +41,8 @@ export function RightPanel() {
         if (mounted) setActivities(payload.items ?? []);
       } catch {
         if (mounted) setActivities([]);
+      } finally {
+        if (mounted) setLoading(false);
       }
     }
 
@@ -49,6 +53,8 @@ export function RightPanel() {
       window.clearInterval(interval);
     };
   }, []);
+
+  if (loading) return <DashboardRightPanelSkeleton />;
 
   return (
     <aside className="hidden w-80 border-l border-border bg-surface/90 px-5 py-6 xl:block">

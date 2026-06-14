@@ -10,6 +10,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
+import { AttendancePageSkeleton } from '@/components/skeletons/page-skeletons';
 import { attendanceService } from '@/lib/services/attendance.service';
 
 type Mode = 'overview' | 'main-service' | 'children-service' | 'vehicles' | 'sections' | 'history' | 'custom';
@@ -105,7 +106,7 @@ export function AttendancePage({ mode, sectionId }: { mode: Mode; sectionId?: st
     custom: { title: detail?.section?.name ?? 'Attendance Section', subtitle: detail?.section?.description ?? 'Custom attendance section details.', actions: null },
   }[mode];
 
-  if (loading) return <div className="rounded-lg border border-border bg-card p-6 text-sm text-secondary">Loading attendance data...</div>;
+  if (loading) return <AttendancePageSkeleton />;
 
   return (
     <div className="space-y-6">

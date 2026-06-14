@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { peopleService } from '@/lib/services/people.service';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
@@ -86,9 +87,18 @@ export function PeopleSelector({
             </button>
           );
         })}
-        {!items.length ? (
+        {loading && !items.length ? (
+          <div className="space-y-3 px-3 py-4" aria-busy="true" aria-live="polite">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : !items.length ? (
           <div className="space-y-3 px-3 py-4 text-sm text-secondary">
-            <p>{loading ? 'Loading people...' : 'No person found.'}</p>
+            <p>No person found.</p>
             {allowAddNew ? (
               <button type="button" onClick={addNew} className="inline-flex items-center gap-2 rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-darkGreen">
                 <Plus className="h-3.5 w-3.5" />

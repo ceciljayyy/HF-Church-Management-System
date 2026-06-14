@@ -8,6 +8,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
+import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
 import type { DepartmentMembership, DepartmentRecord, Paginated } from './department-types';
 
@@ -122,9 +123,11 @@ export function DepartmentRolesPageClient({ initialData }: { initialData: Pagina
 
       {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
       {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {loading ? <div className="rounded-lg border border-border bg-card px-4 py-6 text-sm text-secondary">Loading department roles...</div> : null}
-
-      <DataTable columns={['User', 'Department', 'Position', 'Role Type', 'Actions']} rows={rows} minWidthClass="min-w-[860px]" />
+      {loading ? (
+        <TableSkeleton rows={6} columns={5} showFilters={false} />
+      ) : (
+        <DataTable columns={['User', 'Department', 'Position', 'Role Type', 'Actions']} rows={rows} minWidthClass="min-w-[860px]" />
+      )}
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm text-secondary sm:flex-row sm:items-center sm:justify-between">
         <span>{data.pagination?.total ?? data.items?.length ?? 0} total role assignments</span>

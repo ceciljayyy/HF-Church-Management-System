@@ -174,7 +174,7 @@ export default function LoginPage() {
               disabled={loading}
               className="mt-6 w-full rounded-2xl bg-gradient-to-r from-lime to-green px-4 py-3 font-semibold text-darkGreen transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              Sign in
             </button>
 
             <p className="mt-4 text-center text-xs text-muted">
