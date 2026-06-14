@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
   const items = await prisma.contribution.findMany({
-    where: { branchId: session.branchId, type: 'WELFARE', deletedAt: null },
+    where: { branchId: session.branchId, type: 'OTHER', notes: { contains: 'financeKind=WELFARE' }, deletedAt: null },
     include: { person: true, receivedBy: true },
     orderBy: { contributionDate: 'desc' },
     take: 100,

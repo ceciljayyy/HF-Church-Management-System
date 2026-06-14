@@ -192,6 +192,28 @@ export async function createPersonWithMembership(input: CreatePersonInput, branc
       });
     }
 
+    if (input.departmentId) {
+      const department = await tx.group.findFirst({
+        where: { id: input.departmentId, branchId, type: 'DEPARTMENT', deletedAt: null },
+      });
+      if (department) {
+        const role = input.departmentRoleType === 'HEAD' ? 'HEAD' : 'MEMBER';
+        const position = nullableText(input.departmentPosition) ?? (role === 'HEAD' ? department.meetingDay ?? 'Head of Department' : 'Member');
+        await tx.groupMember.upsert({
+          where: { groupId_personId: { groupId: department.id, personId: created.id } },
+          update: { role, status: position },
+          create: { groupId: department.id, personId: created.id, role, status: position },
+        });
+        if (role === 'HEAD') {
+          await tx.groupMember.updateMany({
+            where: { groupId: department.id, role: 'HEAD', personId: { not: created.id } },
+            data: { role: 'MEMBER' },
+          });
+          await tx.group.update({ where: { id: department.id }, data: { leaderId: created.id } });
+        }
+      }
+    }
+
     return tx.person.findUnique({
       where: { id: created.id },
       include: {

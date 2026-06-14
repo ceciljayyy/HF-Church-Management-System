@@ -31,18 +31,24 @@ export async function GET(req: NextRequest) {
   if (search) where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }];
 
   if (id) {
-    const item = await prisma.group.findFirst({
-      where: { id, branchId: session.branchId, type: 'DEPARTMENT', deletedAt: null },
-      include: {
-        leader: true,
-        members: {
-          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-          include: { person: true },
+    const [item, transferSetting] = await Promise.all([
+      prisma.group.findFirst({
+        where: { id, branchId: session.branchId, type: 'DEPARTMENT', deletedAt: null },
+        include: {
+          leader: true,
+          members: {
+            orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+            include: { person: true },
+          },
         },
-      },
-    });
+      }),
+      prisma.setting.findUnique({ where: { branchId_key: { branchId: session.branchId, key: 'departments.transferHistory' } } }),
+    ]);
     if (!item) return failure('Department not found', 404);
-    return success({ item });
+    const transfers = Array.isArray(transferSetting?.value)
+      ? transferSetting.value.filter((transfer: any) => transfer.fromDepartmentId === id || transfer.toDepartmentId === id)
+      : [];
+    return success({ item: { ...item, transferHistory: transfers } });
   }
 
   const [items, total] = await Promise.all([

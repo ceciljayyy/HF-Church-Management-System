@@ -8,6 +8,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
+import { PeopleSelector } from '@/components/people/people-selector';
 import { apiClient } from '@/lib/api-client';
 import type { DepartmentMembership, DepartmentRecord, PersonSummary } from './department-types';
 
@@ -149,6 +150,23 @@ export function DepartmentDetailPageClient({
         </div>
       </div>
 
+      <div className="rounded-lg border border-border bg-card p-5">
+        <h3 className="mb-4 text-sm font-semibold text-primary">Transfer History</h3>
+        {(department.transferHistory ?? []).length ? (
+          <DataTable
+            columns={['Date', 'Previous Position', 'New Position', 'Reason']}
+            rows={(department.transferHistory ?? []).slice(0, 6).map((transfer) => [
+              new Date(transfer.transferredAt).toLocaleDateString(),
+              transfer.previousPosition ?? '-',
+              transfer.newPosition ?? '-',
+              transfer.reason ?? '-',
+            ])}
+          />
+        ) : (
+          <p className="text-sm text-secondary">No transfer history yet.</p>
+        )}
+      </div>
+
       <MemberDialog
         mode="add"
         open={addOpen}
@@ -216,13 +234,14 @@ function MemberDialog({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectedPerson, setSelectedPerson] = useState<any | null>(member?.person ? { personId: member.person.id, fullName: personName(member.person) } : null);
   const title = mode === 'add' ? 'Add Department Member' : mode === 'transfer' ? 'Transfer Department Member' : 'Edit Department Role';
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
     const form = new FormData(event.currentTarget);
-    const personId = String(form.get('personId') ?? member?.person.id ?? '');
+    const personId = selectedPerson?.personId ?? String(form.get('personId') ?? member?.person.id ?? '');
     const departmentId = String(form.get('departmentId') ?? department.id);
     const position = String(form.get('position') ?? '').trim();
     if (!personId || !departmentId || !position) {
@@ -232,7 +251,7 @@ function MemberDialog({
 
     setSaving(true);
     try {
-      const payload = { personId, departmentId, position, roleType: form.get('roleType') };
+    const payload = { personId, departmentId, position, roleType: form.get('roleType'), reason: form.get('reason') };
       if (mode === 'add') {
         await apiClient.request('/departments/members', { method: 'POST', body: JSON.stringify(payload) });
       } else {
@@ -252,13 +271,19 @@ function MemberDialog({
       <form className="space-y-4" onSubmit={submit}>
         {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
         {member ? <p className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-secondary">Member: {personName(member.person)}</p> : null}
-        <label className="space-y-2 text-sm text-secondary">
+        <div className="space-y-2 text-sm text-secondary">
           <span>Member</span>
-          <select name="personId" className={inputClass} defaultValue={member?.person.id ?? ''} disabled={mode !== 'add'}>
-            <option value="">Select person</option>
-            {people.map((person) => <option key={person.id} value={person.id}>{personName(person)}</option>)}
-          </select>
-        </label>
+          {mode === 'add' ? (
+            <PeopleSelector
+              value={selectedPerson?.personId}
+              returnTo={`/departments/${department.id}`}
+              placeholder="Search people by name, phone, email, or membership number"
+              onChange={setSelectedPerson}
+            />
+          ) : (
+            <p className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-secondary">{member ? personName(member.person) : 'Selected person'}</p>
+          )}
+        </div>
         <label className="space-y-2 text-sm text-secondary">
           <span>{mode === 'transfer' ? 'New Department' : 'Department'}</span>
           <select name="departmentId" className={inputClass} defaultValue={member?.group?.id ?? department.id}>
@@ -277,6 +302,12 @@ function MemberDialog({
             <option value="HEAD">Head/Leader</option>
           </select>
         </label>
+        {mode === 'transfer' ? (
+          <label className="space-y-2 text-sm text-secondary">
+            <span>Transfer Reason</span>
+            <textarea name="reason" className={inputClass} rows={2} placeholder="Optional reason for the transfer" />
+          </label>
+        ) : null}
         <div className="flex justify-end gap-3 border-t border-border pt-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary">Cancel</button>
           <button type="submit" disabled={saving} className="rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen transition hover:bg-lime/90 disabled:opacity-60">{saving ? 'Saving...' : 'Save'}</button>

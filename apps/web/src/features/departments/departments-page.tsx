@@ -71,9 +71,10 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
         department.leader ? `${department.leader.firstName} ${department.leader.lastName}` : 'No leader assigned',
         department._count?.members ?? 0,
         statusBadge(department.status),
-        <Link key={`${department.id}-view`} href={`/departments/${department.id}`} className="inline-flex items-center justify-end gap-2 text-lime">
+        department.updatedAt ? new Date(department.updatedAt).toLocaleDateString() : '-',
+        <Link key={`${department.id}-view`} href={`/departments/${department.id}`} className="inline-flex items-center justify-end gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-lime transition hover:bg-hover">
           <Eye className="h-4 w-4" />
-          Open
+          View More
         </Link>,
       ]),
     [data.items],
@@ -121,7 +122,7 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
       {loading ? <div className="rounded-lg border border-border bg-card px-4 py-6 text-sm text-secondary">Loading departments...</div> : null}
 
       {rows.length ? (
-        <DataTable columns={['Department', 'Leader Title', 'Leader', 'Members', 'Status', 'Actions']} rows={rows} minWidthClass="min-w-[860px]" />
+        <DataTable columns={['Department', 'Head Position', 'Head of Department', 'Members', 'Status', 'Last Updated', 'Actions']} rows={rows} minWidthClass="min-w-[1040px]" />
       ) : (
         <EmptyState title="No departments yet" description="Create a department to start assigning leaders, positions, and members." />
       )}

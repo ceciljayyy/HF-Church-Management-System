@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
@@ -28,6 +29,18 @@ async function syncLeader(groupId: string, personId: string | null, role: string
   await prisma.groupMember.updateMany({ where: { groupId, role: 'HEAD', personId: { not: personId } }, data: { role: 'MEMBER' } });
   await prisma.group.update({ where: { id: groupId }, data: { leaderId: personId } });
   await prisma.group.updateMany({ where: { branchId, type: 'DEPARTMENT', leaderId: personId, id: { not: groupId } }, data: { leaderId: null } });
+}
+
+async function appendTransferHistory(branchId: string, transfer: Record<string, unknown>) {
+  const key = 'departments.transferHistory';
+  const existing = await prisma.setting.findUnique({ where: { branchId_key: { branchId, key } } });
+  const current = Array.isArray(existing?.value) ? existing.value : [];
+  const value = [transfer, ...current].slice(0, 200) as Prisma.InputJsonValue;
+  await prisma.setting.upsert({
+    where: { branchId_key: { branchId, key } },
+    update: { value },
+    create: { branchId, key, value, type: 'JSON' },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -89,6 +102,20 @@ export async function PATCH(req: NextRequest) {
     await prisma.group.update({ where: { id: existing.groupId }, data: { leaderId: null } });
   }
   await syncLeader(nextGroupId, existing.personId, role, session.branchId);
+
+  if (nextGroupId !== existing.groupId) {
+    await appendTransferHistory(session.branchId, {
+      id: `transfer-${Date.now().toString(36)}`,
+      personId: existing.personId,
+      fromDepartmentId: existing.groupId,
+      toDepartmentId: nextGroupId,
+      previousPosition: existing.status,
+      newPosition: clean(body.position),
+      transferredById: session.userId,
+      reason: clean(body.reason, ''),
+      transferredAt: new Date().toISOString(),
+    });
+  }
 
   return success({ item });
 }

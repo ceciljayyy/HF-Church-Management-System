@@ -22,8 +22,19 @@ export type DepartmentRecord = {
   description?: string | null;
   meetingDay?: string | null;
   status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+  updatedAt?: string;
   leader?: PersonSummary | null;
   members?: DepartmentMembership[];
+  transferHistory?: Array<{
+    id: string;
+    personId: string;
+    fromDepartmentId: string;
+    toDepartmentId: string;
+    previousPosition?: string | null;
+    newPosition?: string | null;
+    reason?: string | null;
+    transferredAt: string;
+  }>;
   _count?: { members: number };
 };
 

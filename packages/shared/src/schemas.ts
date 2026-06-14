@@ -120,6 +120,9 @@ export const createPersonSchema = z.object({
   classification: optionalText,
   membershipDate: optionalDate.nullable(),
   friendDate: optionalDate.nullable(),
+  departmentId: optionalText,
+  departmentPosition: optionalText,
+  departmentRoleType: z.enum(['HEAD', 'MEMBER']).optional(),
   notes: optionalText,
 });
 

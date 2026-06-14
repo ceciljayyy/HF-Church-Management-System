@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
 import { apiClient } from '@/lib/api-client';
@@ -37,6 +37,9 @@ type FormState = {
   linkedin: string;
   classification: string;
   membershipDate: string;
+  departmentId: string;
+  departmentPosition: string;
+  departmentRoleType: 'HEAD' | 'MEMBER';
   friendDate: string;
   notes: string;
 };
@@ -63,6 +66,9 @@ const initialForm: FormState = {
   linkedin: '',
   classification: 'Unassigned',
   membershipDate: '',
+  departmentId: '',
+  departmentPosition: 'Member',
+  departmentRoleType: 'MEMBER',
   friendDate: '',
   notes: '',
 };
@@ -82,6 +88,7 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [mode, setMode] = useState<'save' | 'another'>('save');
   const [saving, setSaving] = useState(false);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -106,6 +113,23 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    async function loadDepartments() {
+      try {
+        const response = await apiClient.listResource('departments', { page: 1, limit: 100, status: 'ACTIVE' });
+        if (!cancelled) setDepartments(response.items ?? []);
+      } catch {
+        if (!cancelled) setDepartments([]);
+      }
+    }
+    loadDepartments();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,6 +171,9 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
           linkedin: form.linkedin,
           classification: form.classification,
           membershipDate: form.membershipDate || null,
+          departmentId: form.departmentId || undefined,
+          departmentPosition: form.departmentPosition,
+          departmentRoleType: form.departmentRoleType,
           friendDate: form.friendDate || null,
           notes: form.notes,
         }),
@@ -247,6 +274,21 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
             </FormField>
             <FormField label="Membership Date"><input className={inputClass} type="date" value={form.membershipDate} onChange={(event) => update('membershipDate', event.target.value)} /></FormField>
             <FormField label="Friend Date"><input className={inputClass} type="date" value={form.friendDate} onChange={(event) => update('friendDate', event.target.value)} /></FormField>
+            <FormField label="Department">
+              <select className={inputClass} value={form.departmentId} onChange={(event) => update('departmentId', event.target.value)}>
+                <option value="">No department</option>
+                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Department Role / Position">
+              <input className={inputClass} value={form.departmentPosition} onChange={(event) => update('departmentPosition', event.target.value)} placeholder="Member, Assistant, Coordinator, Chief Usher" />
+            </FormField>
+            <FormField label="Department Head Status">
+              <select className={inputClass} value={form.departmentRoleType} onChange={(event) => update('departmentRoleType', event.target.value as 'HEAD' | 'MEMBER')}>
+                <option value="MEMBER">Department Member</option>
+                <option value="HEAD">Head of Department</option>
+              </select>
+            </FormField>
             <div className="md:col-span-3">
               <FormField label="Notes"><textarea className={inputClass} rows={3} value={form.notes} onChange={(event) => update('notes', event.target.value)} /></FormField>
             </div>
