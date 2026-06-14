@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getFinanceOverview } from '@/lib/finance';
 
 export async function GET(_req: NextRequest) {
   try {
@@ -20,9 +21,7 @@ export async function GET(_req: NextRequest) {
       activeMembers,
       newMembersThisMonth,
       attendanceToday,
-      tithes,
-      offerings,
-      expenses,
+      financeOverview,
     ] = await Promise.all([
       prisma.member.count({ where: branchFilter }),
       prisma.member.count({ where: { ...branchFilter, status: 'ACTIVE' } }),
@@ -33,32 +32,10 @@ export async function GET(_req: NextRequest) {
           session: session.branchId ? { branchId: session.branchId } : undefined,
         },
       }),
-      prisma.contribution.aggregate({
-        _sum: { amount: true },
-        where: {
-          ...branchFilter,
-          type: 'TITHE',
-          contributionDate: { gte: startOfMonth },
-        },
-      }),
-      prisma.contribution.aggregate({
-        _sum: { amount: true },
-        where: {
-          ...branchFilter,
-          type: 'OFFERING',
-          contributionDate: { gte: startOfMonth },
-        },
-      }),
-      prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, expenseDate: { gte: startOfMonth } },
-      }),
+      getFinanceOverview(session.branchId),
     ]);
 
-    const tithesValue = Number(tithes._sum.amount ?? 0);
-    const offeringsValue = Number(offerings._sum.amount ?? 0);
-    const expensesValue = Number(expenses._sum.amount ?? 0);
-    const totalGivingThisMonth = tithesValue + offeringsValue;
+    const expensesValue = financeOverview.expenses;
 
     const months = Array.from({ length: 6 }, (_, index) => {
       const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
@@ -68,8 +45,6 @@ export async function GET(_req: NextRequest) {
     const [
       memberHistory,
       attendanceHistory,
-      contributionHistory,
-      expenseHistory,
     ] = await Promise.all([
       prisma.member.findMany({ where: { ...branchFilter, createdAt: { gte: startWindow } }, select: { createdAt: true } }),
       prisma.attendanceRecord.findMany({
@@ -78,14 +53,6 @@ export async function GET(_req: NextRequest) {
           session: session.branchId ? { branchId: session.branchId } : undefined,
         },
         select: { checkedInAt: true },
-      }),
-      prisma.contribution.findMany({
-        where: { ...branchFilter, contributionDate: { gte: startWindow } },
-        select: { contributionDate: true, amount: true, type: true },
-      }),
-      prisma.expense.findMany({
-        where: { ...branchFilter, expenseDate: { gte: startWindow } },
-        select: { expenseDate: true, amount: true },
       }),
     ]);
 
@@ -113,30 +80,25 @@ export async function GET(_req: NextRequest) {
       };
     });
 
-    const financeSeries = months.map((month) => {
-      const key = monthKey(month);
-      const giving = contributionHistory
-        .filter((item) => monthKey(item.contributionDate) === key)
-        .reduce((total, item) => total + Number(item.amount), 0);
-      const monthExpenses = expenseHistory
-        .filter((item) => monthKey(item.expenseDate) === key)
-        .reduce((total, item) => total + Number(item.amount), 0);
-      return { name: monthLabel(month), giving, expenses: monthExpenses };
-    });
-
     return success({
       membersTotal,
       activeMembers,
       newMembersThisMonth,
       attendanceToday,
-      totalGivingThisMonth,
-      tithes: tithesValue,
-      offerings: offeringsValue,
+      welfareCollectedThisMonth: financeOverview.totalWelfareCollectedThisMonth,
+      welfareArrears: financeOverview.welfareArrears,
+      fundContributionsThisMonth: financeOverview.fundContributionsThisMonth,
+      totalFundContributions: financeOverview.totalFundContributions,
       expenses: expensesValue,
-      netBalance: totalGivingThisMonth - expensesValue,
+      netBalance: financeOverview.netBalance,
+      pendingExpenseApprovals: financeOverview.pendingExpenseApprovals,
+      activeFundCampaigns: financeOverview.activeFunds,
+      fundsAvailable: financeOverview.fundsAvailable,
       memberGrowthSeries,
       attendanceSeries,
-      financeSeries,
+      financeSeries: financeOverview.financeSeries,
+      givingByType: financeOverview.givingByType,
+      expensesByCategory: financeOverview.expensesByCategory,
       upcomingEvents: await prisma.event.findMany({
         where: { ...branchFilter, status: 'PUBLISHED' },
         take: 5,

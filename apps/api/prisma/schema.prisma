@@ -82,7 +82,12 @@ enum ContributionType {
   TITHE
   OFFERING
   DONATION
+  THANKSGIVING
   SEED
+  BUILDING_FUND
+  WELFARE
+  MISSIONS
+  SPECIAL_PROJECT
   OTHER
 }
 
@@ -91,14 +96,35 @@ enum PaymentMethod {
   CARD
   BANK_TRANSFER
   MOBILE_MONEY
+  CHEQUE
   OTHER
 }
 
 enum ExpenseStatus {
+  DRAFT
   PENDING
   APPROVED
   PAID
   REJECTED
+  CANCELLED
+}
+
+enum PledgeStatus {
+  ACTIVE
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum FundStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ReceiptStatus {
+  ISSUED
+  VOID
 }
 
 enum SettingType {
@@ -149,6 +175,9 @@ model Branch {
   financialFunds     FinancialFund[]
   contributions      Contribution[]
   expenses           Expense[]
+  pledges            Pledge[]
+  pledgePayments     PledgePayment[]
+  receipts           Receipt[]
   settings           Setting[]
   auditLogs          AuditLog[]
   activityLogs       ActivityLog[]
@@ -179,6 +208,7 @@ model User {
   contributionsReceived     Contribution[]      @relation("ContributionReceivedBy")
   expensesRequested         Expense[]           @relation("ExpenseRequestedBy")
   expensesApproved          Expense[]           @relation("ExpenseApprovedBy")
+  pledgePaymentsReceived    PledgePayment[]     @relation("PledgePaymentReceivedBy")
   auditLogs                 AuditLog[]
   activityLogs              ActivityLog[]
 
@@ -272,6 +302,7 @@ model Person {
   ledGroups         Group[]            @relation("GroupLeader")
   groupMemberships  GroupMember[]
   contributions     Contribution[]
+  pledges           Pledge[]
   attendanceRecords AttendanceRecord[]
 
   @@index([branchId])
@@ -439,32 +470,47 @@ model AttendanceRecord {
 }
 
 model FinancialFund {
-  id          String  @id @default(cuid())
-  branchId    String
-  name        String
-  description String?
-  isActive    Boolean @default(true)
+  id             String     @id @default(cuid())
+  branchId       String
+  name           String
+  description    String?
+  openingBalance Decimal    @default(0) @db.Decimal(14, 2)
+  restricted     Boolean    @default(false)
+  status         FundStatus @default(ACTIVE)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now()) @updatedAt
 
   branch        Branch         @relation(fields: [branchId], references: [id])
   contributions Contribution[]
+  expenses      Expense[]
+  pledges       Pledge[]
 
   @@unique([branchId, name])
   @@index([branchId])
+  @@index([status])
 }
 
 model Contribution {
   id               String           @id @default(cuid())
   branchId         String
+  contributionNumber String?
   personId         String?
+  contributorName  String?
+  isAnonymous      Boolean          @default(false)
   fundId           String?
   type             ContributionType @default(OFFERING)
   amount           Decimal          @db.Decimal(14, 2)
-  currency         String           @default("USD")
+  currency         String           @default("GHS")
   paymentMethod    PaymentMethod    @default(CASH)
+  paymentReference String?
   reference        String?          @unique
   contributionDate DateTime
   receivedById     String?
+  receivedByName   String?
   notes            String?
+  receiptNumber    String?
+  status           String           @default("RECORDED")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
@@ -473,6 +519,7 @@ model Contribution {
   person     Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
   fund       FinancialFund? @relation(fields: [fundId], references: [id], onDelete: SetNull)
   receivedBy User?          @relation("ContributionReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  receipts   Receipt[]
 
   @@index([branchId])
   @@index([type])
@@ -482,15 +529,21 @@ model Contribution {
 model Expense {
   id            String        @id @default(cuid())
   branchId      String
+  expenseNumber String?
   category      String
   title         String
   description   String?
+  fundId        String?
   amount        Decimal       @db.Decimal(14, 2)
-  currency      String        @default("USD")
+  currency      String        @default("GHS")
   paymentMethod PaymentMethod @default(CASH)
+  vendorName    String?
   expenseDate   DateTime
+  dueDate       DateTime?
   requestedById String?
+  requestedByName String?
   approvedById  String?
+  approvedByName String?
   status        ExpenseStatus @default(PENDING)
   receiptUrl    String?
   createdAt     DateTime      @default(now())
@@ -498,12 +551,89 @@ model Expense {
   deletedAt     DateTime?
 
   branch      Branch @relation(fields: [branchId], references: [id])
+  fund        FinancialFund? @relation(fields: [fundId], references: [id], onDelete: SetNull)
   requestedBy User?  @relation("ExpenseRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
   approvedBy  User?  @relation("ExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([branchId, title, expenseDate])
   @@index([branchId])
+  @@index([fundId])
   @@index([status])
+}
+
+model Pledge {
+  id              String       @id @default(cuid())
+  branchId        String
+  pledgeNumber    String?
+  title           String
+  contributorId   String?
+  contributorName String
+  fundId          String?
+  targetAmount    Decimal      @db.Decimal(14, 2)
+  currency        String       @default("GHS")
+  startDate       DateTime
+  dueDate         DateTime
+  status          PledgeStatus @default(ACTIVE)
+  note            String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  branch   Branch          @relation(fields: [branchId], references: [id])
+  person   Person?         @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+  fund     FinancialFund?  @relation(fields: [fundId], references: [id], onDelete: SetNull)
+  payments PledgePayment[]
+
+  @@index([branchId])
+  @@index([fundId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model PledgePayment {
+  id            String        @id @default(cuid())
+  branchId      String
+  pledgeId      String
+  amount        Decimal       @db.Decimal(14, 2)
+  currency      String        @default("GHS")
+  paymentMethod PaymentMethod @default(CASH)
+  paymentDate   DateTime
+  reference     String?
+  receivedById  String?
+  receivedByName String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  branch     Branch @relation(fields: [branchId], references: [id])
+  pledge     Pledge @relation(fields: [pledgeId], references: [id], onDelete: Cascade)
+  receivedBy User?  @relation("PledgePaymentReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  receipt    Receipt?
+
+  @@index([branchId])
+  @@index([pledgeId])
+  @@index([paymentDate])
+}
+
+model Receipt {
+  id              String        @id @default(cuid())
+  branchId        String
+  receiptNumber   String        @unique
+  contributionId  String?
+  pledgePaymentId String?       @unique
+  amount          Decimal       @db.Decimal(14, 2)
+  currency        String        @default("GHS")
+  issuedTo        String
+  issuedAt        DateTime      @default(now())
+  status          ReceiptStatus @default(ISSUED)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  branch        Branch         @relation(fields: [branchId], references: [id])
+  contribution  Contribution?  @relation(fields: [contributionId], references: [id], onDelete: SetNull)
+  pledgePayment PledgePayment? @relation(fields: [pledgePaymentId], references: [id], onDelete: SetNull)
+
+  @@index([branchId])
+  @@index([issuedAt])
 }
 
 model Setting {

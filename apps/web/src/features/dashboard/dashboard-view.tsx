@@ -27,9 +27,15 @@ export function DashboardView({ summary }: { summary: any }) {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="New members this month" value={summary.newMembersThisMonth ?? 0} icon={<UserPlus className="h-5 w-5" />} accent="green" />
-        <StatCard label="Tithes" value={formatCurrency(summary.tithes ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="lime" />
-        <StatCard label="Total giving this month" value={formatCurrency(summary.totalGivingThisMonth ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="green" />
-        <StatCard label="Expenses" value={formatCurrency(summary.expenses ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="danger" />
+        <StatCard label="Welfare collected this month" value={formatCurrency(summary.welfareCollectedThisMonth ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="lime" />
+        <StatCard label="Welfare arrears" value={formatCurrency(summary.welfareArrears ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="warning" />
+        <StatCard label="Expenses this month" value={formatCurrency(summary.expenses ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="danger" />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Pending approvals" value={summary.pendingExpenseApprovals ?? 0} icon={<HandCoins className="h-5 w-5" />} accent="warning" />
+        <StatCard label="Active fund campaigns" value={summary.activeFundCampaigns ?? 0} icon={<HandCoins className="h-5 w-5" />} accent="lime" />
+        <StatCard label="Fund contributions this month" value={formatCurrency(summary.fundContributionsThisMonth ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="green" />
       </section>
 
       <DashboardCharts
@@ -78,8 +84,9 @@ export function DashboardView({ summary }: { summary: any }) {
           <DataTable
             columns={['Category', 'Amount']}
             rows={[
-              ['Tithes', formatCurrency(summary.tithes ?? 0)],
-              ['Offerings', formatCurrency(summary.offerings ?? 0)],
+              ['Welfare collected', formatCurrency(summary.welfareCollectedThisMonth ?? 0)],
+              ['Welfare arrears', formatCurrency(summary.welfareArrears ?? 0)],
+              ['Fund contributions', formatCurrency(summary.fundContributionsThisMonth ?? 0)],
               ['Expenses', formatCurrency(summary.expenses ?? 0)],
             ]}
           />

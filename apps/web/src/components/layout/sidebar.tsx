@@ -42,10 +42,10 @@ const sections = [
     label: 'Finance',
     items: [
       { href: '/finance', label: 'Overview', icon: HandCoins },
-      { href: '/finance/contributions', label: 'Contributions', icon: HandCoins },
+      { href: '/finance/welfare', label: 'Welfare', icon: HandCoins },
       { href: '/finance/expenses', label: 'Expenses', icon: HandCoins },
-      { href: '/finance/pledges', label: 'Pledges', icon: HandCoins },
       { href: '/finance/funds', label: 'Funds', icon: HandCoins },
+      { href: '/finance/history', label: 'History', icon: ScrollText },
     ],
   },
   {
