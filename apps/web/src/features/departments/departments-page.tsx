@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import type { DepartmentRecord, Paginated } from './department-types';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
@@ -27,12 +28,9 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
   const [status, setStatus] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   async function loadDepartments(next?: { page?: number; search?: string; status?: string }) {
     setLoading(true);
-    setError('');
     const nextPage = next?.page ?? page;
     try {
       const response = await apiClient.listResource('departments', {
@@ -44,7 +42,7 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
       setData(response);
       setPage(response.pagination?.page ?? nextPage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load departments.');
+      showErrorToast(err, 'Unable to load departments.');
     } finally {
       setLoading(false);
     }
@@ -118,8 +116,6 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
         </FilterBar>
       </form>
 
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
       {loading ? (
         <TableSkeleton rows={6} columns={7} showFilters={false} />
       ) : rows.length ? (
@@ -141,7 +137,7 @@ export function DepartmentsPageClient({ initialData }: { initialData: Paginated<
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onCreated={() => {
-          setMessage('Department created successfully.');
+          showSuccessToast('Department created successfully.');
           loadDepartments({ page: 1 });
         }}
       />

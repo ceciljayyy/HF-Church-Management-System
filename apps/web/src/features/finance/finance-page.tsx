@@ -15,6 +15,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { ExpensesPageSkeleton, FinanceOverviewSkeleton, FundsPageSkeleton, WelfarePageSkeleton } from '@/components/skeletons/page-skeletons';
 import { financeService, type ExpenseFilters } from '@/lib/services/finance.service';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import { formatCurrency } from '@/lib/utils';
 
 type FinanceMode = 'overview' | 'welfare' | 'expenses' | 'funds' | 'history';
@@ -102,8 +103,6 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expensesLoading, setExpensesLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [expenseFilters, setExpenseFilters] = useState<ExpenseFilters>(initialExpenseFilters);
   const [modal, setModal] = useState<ModalName>(null);
   const [selectedFundType, setSelectedFundType] = useState<any>(null);
@@ -111,7 +110,6 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   const [memberDetail, setMemberDetail] = useState<any>(null);
 
   async function loadFinance() {
-    setError('');
     try {
       const [overviewData, welfareData, expenseData, fundTypeData, fundData, historyData] = await Promise.all([
         financeService.getFinanceOverview(),
@@ -128,14 +126,14 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
       setFunds(fundData.items ?? []);
       setHistory(historyData.items ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load finance data.');
+      if (mode !== 'overview') showErrorToast(err, 'Unable to load finance data.');
     } finally {
       setLoading(false);
     }
   }
 
   async function afterMutation(messageText: string) {
-    setMessage(messageText);
+    showSuccessToast(messageText);
     setModal(null);
     setSelectedFund(null);
     setSelectedFundType(null);
@@ -204,8 +202,6 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
   return (
     <div className="space-y-6">
       <PageHeader title={page.title} subtitle={page.subtitle} actions={page.actions} />
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
 
       {mode === 'overview' ? <Overview overview={overview} welfare={welfare} funds={funds} history={history} /> : null}
       {mode === 'welfare' ? <WelfareView welfare={welfare} onMember={setMemberDetail} /> : null}
@@ -234,13 +230,12 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
 
   async function applyExpenseFilters(nextFilters = expenseFilters) {
     setExpensesLoading(true);
-    setError('');
     try {
       const response = await financeService.getExpenses(nextFilters);
       setExpenses(response.items ?? []);
       syncExpenseFilterUrl(nextFilters);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to filter expenses.');
+      showErrorToast(err, 'Unable to filter expenses.');
     } finally {
       setExpensesLoading(false);
     }
@@ -533,10 +528,14 @@ function WelfareTable({ members, onMember }: { members: any[]; onMember: (member
 
 function ExpensesTable({ expenses, onUpdated }: { expenses: any[]; onUpdated?: (message: string) => void }) {
   async function run(action: 'approve' | 'reject' | 'paid', id: string) {
-    if (action === 'approve') await financeService.approveExpense(id);
-    if (action === 'reject') await financeService.rejectExpense(id);
-    if (action === 'paid') await financeService.markExpensePaid(id);
-    onUpdated?.('Expense status updated.');
+    try {
+      if (action === 'approve') await financeService.approveExpense(id);
+      if (action === 'reject') await financeService.rejectExpense(id);
+      if (action === 'paid') await financeService.markExpensePaid(id);
+      onUpdated?.('Expense status updated.');
+    } catch (err) {
+      showErrorToast(err, 'Unable to update expense status.');
+    }
   }
   const rows = expenses.map((item) => [
     new Date(item.expenseDate).toLocaleDateString(),

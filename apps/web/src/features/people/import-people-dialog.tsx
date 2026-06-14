@@ -4,6 +4,7 @@ import { ChangeEvent, useMemo, useState } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { DataTable } from '@/components/ui/data-table';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import type { ImportResult } from './people-types';
 
 const fields = [
@@ -178,9 +179,10 @@ export function ImportPeopleDialog({
         body: JSON.stringify({ rows: mappedRows }),
       });
       setResult(data);
+      showSuccessToast(`Imported ${data.imported} of ${data.totalRows}. Skipped ${data.skipped}; duplicates ${data.duplicates}.`);
       onImported();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to import people.');
+      showErrorToast(err, 'Unable to import people.');
     } finally {
       setImporting(false);
     }
@@ -196,12 +198,6 @@ export function ImportPeopleDialog({
     >
       <div className="space-y-5">
         {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-        {result ? (
-          <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">
-            Imported {result.imported} of {result.totalRows}. Skipped {result.skipped}; duplicates {result.duplicates}.
-          </div>
-        ) : null}
-
         <div className="rounded-lg border border-dashed border-border bg-surface/60 p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>

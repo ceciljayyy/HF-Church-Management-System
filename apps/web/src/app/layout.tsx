@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata = {
@@ -9,7 +10,22 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster
+          richColors
+          closeButton
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#181C20',
+              border: '1px solid #2A3036',
+              color: '#F8FAFC',
+              borderRadius: '0.75rem',
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

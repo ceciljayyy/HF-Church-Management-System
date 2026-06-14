@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { AttendancePageSkeleton } from '@/components/skeletons/page-skeletons';
 import { attendanceService } from '@/lib/services/attendance.service';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 type Mode = 'overview' | 'main-service' | 'children-service' | 'vehicles' | 'sections' | 'history' | 'custom';
 
@@ -45,14 +46,11 @@ export function AttendancePage({ mode, sectionId }: { mode: Mode; sectionId?: st
   const [history, setHistory] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [recordSection, setRecordSection] = useState<any>(null);
   const [showSectionPicker, setShowSectionPicker] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
 
   async function loadAttendance() {
-    setError('');
     try {
       const [overviewData, sectionsData, historyData] = await Promise.all([
         attendanceService.getAttendanceOverview(),
@@ -67,14 +65,14 @@ export function AttendancePage({ mode, sectionId }: { mode: Mode; sectionId?: st
       if (mode === 'vehicles') setDetail(await attendanceService.getVehicleStats());
       if (mode === 'custom' && sectionId) setDetail(await attendanceService.getAttendanceSectionById(sectionId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load attendance data.');
+      showErrorToast(err, 'Unable to load attendance data.');
     } finally {
       setLoading(false);
     }
   }
 
   async function afterSave(messageText: string) {
-    setMessage(messageText);
+    showSuccessToast(messageText);
     setRecordSection(null);
     setShowSectionPicker(false);
     setShowBuilder(false);
@@ -111,8 +109,6 @@ export function AttendancePage({ mode, sectionId }: { mode: Mode; sectionId?: st
   return (
     <div className="space-y-6">
       <PageHeader title={page.title} subtitle={page.subtitle} actions={page.actions} />
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
 
       {mode === 'overview' ? <Overview overview={overview} sections={sections} onRecord={setRecordSection} /> : null}
       {mode === 'sections' ? <SectionsView sections={sections} /> : null}

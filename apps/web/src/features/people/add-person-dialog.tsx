@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
 const sectionClass = 'rounded-lg border border-border bg-surface/60 p-4';
@@ -90,7 +91,6 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [departments, setDepartments] = useState<any[]>([]);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const months = useMemo(
     () => [
@@ -134,7 +134,6 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-    setSuccess('');
 
     if (!form.firstName.trim() || !form.lastName.trim()) {
       setError('First name and last name are required.');
@@ -178,12 +177,12 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
           notes: form.notes,
         }),
       });
-      setSuccess('Person saved successfully.');
+      showSuccessToast('Person saved successfully.');
       setForm(initialForm);
       onCreated();
       if (mode === 'save') onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save person.');
+      showErrorToast(err, 'Unable to save person.');
     } finally {
       setSaving(false);
     }
@@ -199,7 +198,6 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
     >
       <form className="space-y-5" onSubmit={submit}>
         {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-        {success ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{success}</div> : null}
 
         <section className={sectionClass}>
           <h4 className="mb-4 text-sm font-semibold text-primary">Name & Identity</h4>

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import { PageHeader } from '@/components/ui/page-header';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
@@ -35,23 +36,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function SettingsPageClient({ user }: { user: any }) {
   const router = useRouter();
   const [active, setActive] = useState(menu[0]);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const profile = user?.profile ?? {};
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage('');
-    setError('');
     setSaving(true);
     const form = Object.fromEntries(new FormData(event.currentTarget));
     try {
       await apiClient.request('/settings', { method: 'POST', body: JSON.stringify({ key: `ui.${active}`, value: form, type: 'JSON' }) });
-      setMessage('Settings saved successfully.');
+      showSuccessToast('Settings saved successfully.');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+      showErrorToast(err, 'Unable to save settings.');
     } finally {
       setSaving(false);
     }
@@ -59,8 +56,6 @@ export function SettingsPageClient({ user }: { user: any }) {
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage('');
-    setError('');
     setSaving(true);
     const form = Object.fromEntries(new FormData(event.currentTarget));
     try {
@@ -68,10 +63,10 @@ export function SettingsPageClient({ user }: { user: any }) {
         method: 'PATCH',
         body: JSON.stringify(form),
       });
-      setMessage('Profile updated successfully.');
+      showSuccessToast('Profile updated successfully.');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update profile.');
+      showErrorToast(err, 'Unable to update profile.');
     } finally {
       setSaving(false);
     }
@@ -79,8 +74,6 @@ export function SettingsPageClient({ user }: { user: any }) {
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage('');
-    setError('');
     setSaving(true);
     const form = Object.fromEntries(new FormData(event.currentTarget));
     try {
@@ -89,10 +82,10 @@ export function SettingsPageClient({ user }: { user: any }) {
         body: JSON.stringify(form),
       });
       event.currentTarget.reset();
-      setMessage('Password changed successfully.');
+      showSuccessToast('Password changed successfully.');
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to change password.');
+      showErrorToast(err, 'Unable to change password.');
     } finally {
       setSaving(false);
     }
@@ -112,8 +105,6 @@ export function SettingsPageClient({ user }: { user: any }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" subtitle="Manage account, church profile, department, finance, attendance, privacy, and system preferences." />
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
       <div className="grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
         <aside className="rounded-lg border border-border bg-card p-3">
           <nav className="space-y-1">

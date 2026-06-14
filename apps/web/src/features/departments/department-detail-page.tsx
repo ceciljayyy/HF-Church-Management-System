@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { PeopleSelector } from '@/components/people/people-selector';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import type { DepartmentMembership, DepartmentRecord, PersonSummary } from './department-types';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
@@ -41,17 +42,14 @@ export function DepartmentDetailPageClient({
   const [transferring, setTransferring] = useState<DepartmentMembership | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const pageSize = 10;
 
   async function reload() {
-    setError('');
     try {
       const response = await apiClient.listResource('departments', { id: department.id });
       setDepartment(response.item);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load department.');
+      showErrorToast(err, 'Unable to load department.');
     }
   }
 
@@ -60,10 +58,10 @@ export function DepartmentDetailPageClient({
     if (!window.confirm(`Remove ${personName(member.person)} from ${department.name}?`)) return;
     try {
       await apiClient.request(`/departments/members?id=${member.id}`, { method: 'DELETE' });
-      setMessage('Department member removed.');
+      showSuccessToast('Department member removed.');
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to remove member.');
+      showErrorToast(err, 'Unable to remove member.');
     }
   }
 
@@ -132,9 +130,6 @@ export function DepartmentDetailPageClient({
         ))}
       </div>
 
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
-
       {rows.length ? (
         <DataTable columns={['Member', 'Email / Phone', 'Department', 'Position', 'Role Status', 'Actions']} rows={rows} minWidthClass="min-w-[980px]" />
       ) : (
@@ -175,7 +170,7 @@ export function DepartmentDetailPageClient({
         department={department}
         onClose={() => setAddOpen(false)}
         onSaved={async () => {
-          setMessage('Department member saved.');
+          showSuccessToast('Department member saved.');
           await reload();
         }}
       />
@@ -189,7 +184,7 @@ export function DepartmentDetailPageClient({
           department={department}
           onClose={() => setEditing(null)}
           onSaved={async () => {
-            setMessage('Department role updated.');
+            showSuccessToast('Department role updated.');
             await reload();
           }}
         />
@@ -204,7 +199,7 @@ export function DepartmentDetailPageClient({
           department={department}
           onClose={() => setTransferring(null)}
           onSaved={async () => {
-            setMessage('Member transferred successfully.');
+            showSuccessToast('Member transferred successfully.');
             await reload();
           }}
         />

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import { AddPersonDialog } from './add-person-dialog';
 import { ImportPeopleDialog } from './import-people-dialog';
 import type { PeopleListResponse, PersonRecord } from './people-types';
@@ -62,7 +63,6 @@ export function PeoplePageClient({
   const [editingPerson, setEditingPerson] = useState<PersonRecord | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const canCreate = hasPermission(permissions, 'people.create');
   const canImport = hasPermission(permissions, 'people.import') || canCreate;
@@ -71,7 +71,6 @@ export function PeoplePageClient({
 
   async function loadPeople(next?: { search?: string; status?: string; classification?: string; page?: number }) {
     setLoading(true);
-    setError('');
     const nextPage = next?.page ?? page;
     try {
       const response = await apiClient.listResource('people', {
@@ -84,7 +83,7 @@ export function PeoplePageClient({
       setData(response);
       setPage(response.pagination?.page ?? nextPage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load people.');
+      showErrorToast(err, 'Unable to load people.');
     } finally {
       setLoading(false);
     }
@@ -110,12 +109,12 @@ export function PeoplePageClient({
     if (!window.confirm(`Are you sure you want to ${label} ${displayName(person)}?`)) return;
 
     setLoading(true);
-    setError('');
     try {
       await apiClient.request(`/people?id=${person.id}&mode=${mode}`, { method: 'DELETE' });
+      showSuccessToast(mode === 'archive' ? 'Person archived successfully.' : 'Person deleted successfully.');
       await loadPeople();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Unable to ${mode} person.`);
+      showErrorToast(err, `Unable to ${mode} person.`);
     } finally {
       setLoading(false);
     }
@@ -262,7 +261,6 @@ export function PeoplePageClient({
         </FilterBar>
       </form>
 
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
       {loading ? (
         <TableSkeleton rows={7} columns={8} avatarColumn={true} showFilters={false} />
       ) : rows.length ? (

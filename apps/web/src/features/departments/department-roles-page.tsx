@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { apiClient } from '@/lib/api-client';
+import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import type { DepartmentMembership, DepartmentRecord, Paginated } from './department-types';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
@@ -30,12 +31,9 @@ export function DepartmentRolesPageClient({ initialData }: { initialData: Pagina
   const [editing, setEditing] = useState<DepartmentMembership | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
 
   async function loadRoles(next?: { page?: number; role?: string; search?: string }) {
     setLoading(true);
-    setError('');
     const nextPage = next?.page ?? page;
     try {
       const response = await apiClient.listResource('departments/roles', {
@@ -47,7 +45,7 @@ export function DepartmentRolesPageClient({ initialData }: { initialData: Pagina
       setData(response);
       setPage(response.pagination?.page ?? nextPage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load department roles.');
+      showErrorToast(err, 'Unable to load department roles.');
     } finally {
       setLoading(false);
     }
@@ -121,8 +119,6 @@ export function DepartmentRolesPageClient({ initialData }: { initialData: Pagina
         </FilterBar>
       </form>
 
-      {message ? <div className="rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-sm text-green">{message}</div> : null}
-      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
       {loading ? (
         <TableSkeleton rows={6} columns={5} showFilters={false} />
       ) : (
@@ -144,7 +140,7 @@ export function DepartmentRolesPageClient({ initialData }: { initialData: Pagina
           departments={data.departments ?? []}
           onClose={() => setEditing(null)}
           onSaved={async () => {
-            setMessage('Department role updated.');
+            showSuccessToast('Department role updated.');
             await loadRoles();
           }}
         />
