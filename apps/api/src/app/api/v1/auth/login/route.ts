@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { comparePassword } from '@/lib/auth';
 import { buildSessionCookie, createSessionToken } from '@/lib/session';
 import { failure, success } from '@/lib/http';
+import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -51,12 +52,23 @@ export async function POST(req: NextRequest) {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+    await createAuditLog({
+      branchId: user.branchId,
+      userId: user.id,
+      action: 'LOGIN',
+      entity: 'User',
+      entityId: user.id,
+      module: 'auth',
+      newValue: { message: 'User logged in' },
+      ...auditMetaFromRequest(req),
+    });
 
     const response = success({
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
+        avatarUrl: user.avatarUrl,
         branchId: user.branchId,
         status: user.status,
         roles,

@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { PageHeader } from '@/components/ui/page-header';
@@ -15,12 +14,8 @@ const menu = [
   'Appearance',
   'Language and Region',
   'Church Profile',
-  'Departments',
-  'Finance Settings',
-  'Attendance Settings',
-  'Users and Roles',
+  'System Preferences',
   'Data and Privacy',
-  'Help and About',
   'Logout',
 ];
 
@@ -42,11 +37,14 @@ export function SettingsPageClient({ user }: { user: any }) {
   const [active, setActive] = useState(menu[0]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const profile = user?.profile ?? {};
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
     setError('');
+    setSaving(true);
     const form = Object.fromEntries(new FormData(event.currentTarget));
     try {
       await apiClient.request('/settings', { method: 'POST', body: JSON.stringify({ key: `ui.${active}`, value: form, type: 'JSON' }) });
@@ -54,6 +52,49 @@ export function SettingsPageClient({ user }: { user: any }) {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage('');
+    setError('');
+    setSaving(true);
+    const form = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      await apiClient.request('/settings/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(form),
+      });
+      setMessage('Profile updated successfully.');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update profile.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage('');
+    setError('');
+    setSaving(true);
+    const form = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      await apiClient.request('/settings/change-password', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      event.currentTarget.reset();
+      setMessage('Password changed successfully.');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to change password.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -109,21 +150,21 @@ export function SettingsPageClient({ user }: { user: any }) {
           ) : null}
 
           {active === 'Edit Profile' ? (
-            <form className="space-y-4" onSubmit={save}>
+            <form className="space-y-4" onSubmit={saveProfile}>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Full name"><input name="name" className={inputClass} defaultValue={user?.name ?? ''} /></Field>
-                <Field label="Username"><input name="username" className={inputClass} defaultValue={user?.email?.split('@')[0] ?? ''} /></Field>
+                <Field label="Username"><input name="username" className={inputClass} defaultValue={profile?.username ?? user?.email?.split('@')[0] ?? ''} /></Field>
                 <Field label="Email"><input name="email" type="email" className={inputClass} defaultValue={user?.email ?? ''} /></Field>
-                <Field label="Phone number"><input name="phone" className={inputClass} /></Field>
-                <Field label="Profile photo URL"><input name="profilePhotoUrl" className={inputClass} /></Field>
-                <Field label="Bio / note"><textarea name="bio" className={inputClass} rows={2} /></Field>
+                <Field label="Phone number"><input name="phone" className={inputClass} defaultValue={profile?.phone ?? ''} /></Field>
+                <Field label="Profile photo URL"><input name="profilePhotoUrl" className={inputClass} defaultValue={user?.avatarUrl ?? ''} /></Field>
+                <Field label="Bio / note"><textarea name="bio" className={inputClass} rows={2} defaultValue={profile?.bio ?? ''} /></Field>
               </div>
-              <SaveActions />
+              <SaveActions saving={saving} />
             </form>
           ) : null}
 
           {active === 'Login and Security' ? (
-            <form className="space-y-4" onSubmit={save}>
+            <form className="space-y-4" onSubmit={changePassword}>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Current password"><input name="currentPassword" type="password" className={inputClass} /></Field>
                 <Field label="New password"><input name="newPassword" type="password" className={inputClass} /></Field>
@@ -131,7 +172,7 @@ export function SettingsPageClient({ user }: { user: any }) {
               </div>
               <Toggle label="Two-factor authentication placeholder" defaultChecked={false} />
               <p className="text-sm text-secondary">Active sessions and logout-all controls will use backend session records when enabled.</p>
-              <SaveActions />
+              <SaveActions saving={saving} />
             </form>
           ) : null}
 
@@ -149,20 +190,16 @@ export function SettingsPageClient({ user }: { user: any }) {
           ) : null}
           {active === 'Language and Region' ? <RegionForm onSubmit={save} /> : null}
           {active === 'Church Profile' ? <ChurchForm onSubmit={save} /> : null}
-          {active === 'Departments' ? <SettingsForm onSubmit={save} fields={['Enable multiple departments per person', 'Require department on new person', 'Department transfer approval required', 'Allow multiple heads per department']} extra={<Field label="Default department role"><input name="defaultDepartmentRole" className={inputClass} defaultValue="Member" /></Field>} /> : null}
-          {active === 'Finance Settings' ? <FinanceSettingsForm onSubmit={save} /> : null}
-          {active === 'Attendance Settings' ? <SettingsForm onSubmit={save} fields={['Enable main service tracking', 'Enable children service tracking', 'Enable vehicle tracking', 'Allow custom attendance sections']} extra={<Field label="Vehicle types"><input name="vehicleTypes" className={inputClass} defaultValue="Cars, Bicycles, Motors/Motorbikes" /></Field>} /> : null}
-          {active === 'Users and Roles' ? <UsersRoles user={user} /> : null}
+          {active === 'System Preferences' ? <SystemPreferencesForm onSubmit={save} /> : null}
           {active === 'Data and Privacy' ? <Placeholder title="Data and Privacy" lines={['Export data placeholder', 'Backup database placeholder', 'Delete account placeholder', 'Privacy policy placeholder']} /> : null}
-          {active === 'Help and About' ? <Placeholder title="Help and About" lines={['Church Management System', 'Version 1.0', 'Support contact placeholder', 'Documentation link placeholder']} /> : null}
         </section>
       </div>
     </div>
   );
 }
 
-function SaveActions() {
-  return <div className="flex justify-end gap-3 border-t border-border pt-4"><button type="reset" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary">Cancel</button><button type="submit" className="rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen">Save Changes</button></div>;
+function SaveActions({ saving = false }: { saving?: boolean }) {
+  return <div className="flex justify-end gap-3 border-t border-border pt-4"><button type="reset" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary">Cancel</button><button type="submit" disabled={saving} className="rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Saving...' : 'Save Changes'}</button></div>;
 }
 
 function SettingsForm({ onSubmit, fields, extra }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void; fields: string[]; extra?: React.ReactNode }) {
@@ -177,12 +214,8 @@ function ChurchForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>
   return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Church name"><input name="churchName" className={inputClass} /></Field><Field label="Branch name"><input name="branchName" className={inputClass} /></Field><Field label="Church email"><input name="churchEmail" className={inputClass} /></Field><Field label="Church phone"><input name="churchPhone" className={inputClass} /></Field><Field label="Address"><input name="address" className={inputClass} /></Field><Field label="City"><input name="city" className={inputClass} /></Field><Field label="Country"><input name="country" className={inputClass} defaultValue="Ghana" /></Field><Field label="Website"><input name="website" className={inputClass} /></Field></div><SaveActions /></form>;
 }
 
-function FinanceSettingsForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Default currency"><input name="currency" className={inputClass} defaultValue="GHS" /></Field><Field label="Welfare initial payment amount"><input name="welfareInitialPayment" type="number" className={inputClass} defaultValue={10} /></Field><Field label="Welfare monthly payment amount"><input name="welfareMonthlyPayment" type="number" className={inputClass} defaultValue={5} /></Field></div><Toggle label="Enable finance approvals" /><Toggle label="Enable receipts" /><Toggle label="Enable fund targets" /><SaveActions /></form>;
-}
-
-function UsersRoles({ user }: { user: any }) {
-  return <div className="space-y-4"><p className="text-sm text-secondary">Current role: {(user?.roles ?? []).join(', ') || 'User'}</p><div className="flex flex-wrap gap-3"><Link href="/admin/users" className="rounded-lg bg-lime px-4 py-3 text-sm font-semibold text-darkGreen">Manage Users</Link><Link href="/admin/roles" className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary">Manage Roles</Link></div></div>;
+function SystemPreferencesForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Default currency"><input name="currency" className={inputClass} defaultValue="GHS" /></Field><Field label="Date format"><input name="dateFormat" className={inputClass} defaultValue="DD/MM/YYYY" /></Field><Field label="Vehicle types"><input name="vehicleTypes" className={inputClass} defaultValue="Cars, Bicycles, Motors/Motorbikes" /></Field><Field label="Default department role"><input name="defaultDepartmentRole" className={inputClass} defaultValue="Member" /></Field></div><Toggle label="Enable finance approvals" /><Toggle label="Enable receipts" /><Toggle label="Enable fund targets" /><Toggle label="Enable custom attendance sections" /><SaveActions /></form>;
 }
 
 function Placeholder({ title, lines }: { title: string; lines: string[] }) {

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
+import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 
 const expenseSchema = z.object({
   title: z.string().min(1),
@@ -110,6 +111,16 @@ export async function POST(req: NextRequest) {
     });
 
     await logFinanceActivity(session.branchId, session.userId, 'Expense submitted', `${item.currency} ${body.amount.toFixed(2)} requested for ${item.title}.`, 'FINANCE_EXPENSE');
+    await createAuditLog({
+      branchId: session.branchId,
+      userId: session.userId,
+      action: 'EXPENSE_CREATE',
+      entity: 'Expense',
+      entityId: item.id,
+      module: 'finance',
+      newValue: { title: item.title, amount: item.amount, currency: item.currency, status: item.status, fundId: item.fundId },
+      ...auditMetaFromRequest(req),
+    });
     return success({ item }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());

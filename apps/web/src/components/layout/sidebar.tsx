@@ -30,7 +30,6 @@ const sections = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/people', label: 'People', icon: Users },
-      { href: '/families', label: 'Families', icon: HeartHandshake },
       { href: '/departments', label: 'Departments', icon: Users },
       { href: '/events', label: 'Events', icon: CalendarDays },
       { href: '/attendance', label: 'Attendance', icon: ClipboardCheck },

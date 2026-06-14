@@ -33,17 +33,22 @@ export async function GET(req: NextRequest) {
         ),
       ),
     ];
+    const profileSetting = await prisma.setting.findUnique({
+      where: { branchId_key: { branchId: user.branchId, key: `userProfile.${user.id}` } },
+    });
 
     return success({
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
+        avatarUrl: user.avatarUrl,
         branchId: user.branchId,
         branch: user.branch,
         status: user.status,
         roles,
         permissions,
+        profile: profileSetting?.value ?? null,
       },
     });
   } catch {

@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { RightPanel } from './right-panel';
 
 export function AppShell({ user, children }: { user: { name: string; email: string; branchName?: string }; children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const showRightPanel = pathname === '/dashboard';
 
   return (
     <div className="flex min-h-screen overflow-x-hidden bg-background text-primary">
@@ -24,7 +27,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
         <Topbar user={user} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
         <main className="min-w-0 flex-1 px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
       </div>
-      <RightPanel />
+      {showRightPanel ? <RightPanel /> : null}
     </div>
   );
 }

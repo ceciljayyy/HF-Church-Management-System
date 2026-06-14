@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { logFinanceActivity } from '@/lib/finance';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +18,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: { status: 'APPROVED', approvedById: session.userId, approvedByName: session.email },
     });
     await logFinanceActivity(session.branchId, session.userId, 'Expense approved', `${item.title} was approved.`, 'FINANCE_EXPENSE_APPROVED');
+    await createAuditLog({
+      branchId: session.branchId,
+      userId: session.userId,
+      action: 'EXPENSE_APPROVE',
+      entity: 'Expense',
+      entityId: item.id,
+      module: 'finance',
+      oldValue: { status: expense.status, approvedById: expense.approvedById },
+      newValue: { status: item.status, approvedById: item.approvedById },
+      ...auditMetaFromRequest(req),
+    });
     return success({ item });
   } catch {
     return failure('Unable to approve expense', 500);

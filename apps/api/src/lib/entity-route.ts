@@ -3,6 +3,7 @@ import { ZodTypeAny } from 'zod';
 import { prisma } from './prisma';
 import { failure, success } from './http';
 import { getTokenFromRequest, verifySessionToken } from './session';
+import { auditMetaFromRequest, createAuditLog } from './audit';
 
 type ResourceConfig = {
   model: keyof typeof prisma;
@@ -81,6 +82,18 @@ export function createEntityRoute(config: ResourceConfig) {
       const parsed = schema ? schema.parse(body) : body;
       const data = config.branchScoped === false || !session?.branchId ? parsed : { ...parsed, branchId: session.branchId };
       const created = await delegate().create({ data });
+      if (session.branchId) {
+        await createAuditLog({
+          branchId: session.branchId,
+          userId: session.userId,
+          action: 'CREATE',
+          entity: String(config.model),
+          entityId: created.id,
+          module: String(config.model),
+          newValue: sanitizeAuditValue(created),
+          ...auditMetaFromRequest(req),
+        });
+      }
       return success({ item: created }, 201);
     },
 
@@ -98,10 +111,33 @@ export function createEntityRoute(config: ResourceConfig) {
         const existing = await delegate().findFirst({ where: { id, branchId: session?.branchId } });
         if (!existing) return failure('Record not found', 404);
         const updated = await delegate().update({ where: { id: existing.id }, data: parsed });
+        await createAuditLog({
+          branchId: session.branchId,
+          userId: session.userId,
+          action: 'UPDATE',
+          entity: String(config.model),
+          entityId: id,
+          module: String(config.model),
+          oldValue: sanitizeAuditValue(existing),
+          newValue: sanitizeAuditValue(updated),
+          ...auditMetaFromRequest(req),
+        });
         return success({ item: updated });
       }
 
       const updated = await delegate().update({ where: { id }, data: parsed });
+      if (session.branchId) {
+        await createAuditLog({
+          branchId: session.branchId,
+          userId: session.userId,
+          action: 'UPDATE',
+          entity: String(config.model),
+          entityId: id,
+          module: String(config.model),
+          newValue: sanitizeAuditValue(updated),
+          ...auditMetaFromRequest(req),
+        });
+      }
       return success({ item: updated });
     },
 
@@ -118,9 +154,32 @@ export function createEntityRoute(config: ResourceConfig) {
           const existing = await delegate().findFirst({ where: { id, branchId: session?.branchId } });
           if (!existing) return failure('Record not found', 404);
           const updated = await delegate().update({ where: { id: existing.id }, data: { [config.archiveField]: new Date() } });
+          await createAuditLog({
+            branchId: session.branchId,
+            userId: session.userId,
+            action: 'ARCHIVE',
+            entity: String(config.model),
+            entityId: id,
+            module: String(config.model),
+            oldValue: sanitizeAuditValue(existing),
+            newValue: sanitizeAuditValue(updated),
+            ...auditMetaFromRequest(req),
+          });
           return success({ item: updated });
         }
         const updated = await delegate().update({ where: { id }, data: { [config.archiveField]: new Date() } });
+        if (session.branchId) {
+          await createAuditLog({
+            branchId: session.branchId,
+            userId: session.userId,
+            action: 'ARCHIVE',
+            entity: String(config.model),
+            entityId: id,
+            module: String(config.model),
+            newValue: sanitizeAuditValue(updated),
+            ...auditMetaFromRequest(req),
+          });
+        }
         return success({ item: updated });
       }
 
@@ -128,10 +187,31 @@ export function createEntityRoute(config: ResourceConfig) {
         const existing = await delegate().findFirst({ where: { id, branchId: session?.branchId } });
         if (!existing) return failure('Record not found', 404);
         await delegate().delete({ where: { id: existing.id } });
+        await createAuditLog({
+          branchId: session.branchId,
+          userId: session.userId,
+          action: 'DELETE',
+          entity: String(config.model),
+          entityId: id,
+          module: String(config.model),
+          oldValue: sanitizeAuditValue(existing),
+          ...auditMetaFromRequest(req),
+        });
         return success({ deleted: true });
       }
 
       await delegate().delete({ where: { id } });
+      if (session.branchId) {
+        await createAuditLog({
+          branchId: session.branchId,
+          userId: session.userId,
+          action: 'DELETE',
+          entity: String(config.model),
+          entityId: id,
+          module: String(config.model),
+          ...auditMetaFromRequest(req),
+        });
+      }
       return success({ deleted: true });
     },
   };
@@ -149,4 +229,15 @@ async function getSession(req: NextRequest) {
 
 export function entityWhereByBranch(branchId?: string | null) {
   return branchId ? { branchId } : {};
+}
+
+function sanitizeAuditValue(value: any) {
+  if (!value || typeof value !== 'object') return value;
+  const clone = { ...value };
+  delete clone.password;
+  delete clone.passwordHash;
+  delete clone.currentPassword;
+  delete clone.newPassword;
+  delete clone.confirmPassword;
+  return clone;
 }
