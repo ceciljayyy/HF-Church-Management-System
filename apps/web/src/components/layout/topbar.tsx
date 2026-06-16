@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Bell, Moon, Search, Sun } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
+import { LAYOUT } from '@/lib/layout-constants';
+import { SidebarToggle } from './sidebar-toggle';
 
 export function Topbar({
   user,
   churchProfile,
+  sidebarOpen,
   onToggleSidebar,
 }: {
   user: { name: string; email: string; branchName?: string };
   churchProfile?: { churchName?: string; branchName?: string | null } | null;
+  sidebarOpen: boolean;
   onToggleSidebar: () => void;
 }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -30,16 +34,17 @@ export function Topbar({
   }
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-border bg-background/80 px-3 py-3 backdrop-blur sm:px-4 lg:px-6 lg:py-4">
+    <header
+      style={{ minHeight: LAYOUT.topbarHeight }}
+      className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-background/90 px-3 py-3 backdrop-blur sm:px-4 lg:px-6"
+    >
       <div className="flex min-w-0 items-center gap-3">
-        <button
-          type="button"
-          aria-label="Toggle navigation"
+        <SidebarToggle
+          expanded={sidebarOpen}
           onClick={onToggleSidebar}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-secondary transition hover:bg-hover hover:text-primary lg:hidden"
-        >
-          <Menu className="h-4 w-4" />
-        </button>
+          label="Open navigation"
+          className="lg:hidden"
+        />
         <div className="min-w-0">
           <p className="hidden truncate text-xs uppercase tracking-[0.24em] text-secondary sm:block">
             {churchProfile?.churchName ?? 'Sunday Service Operations'}

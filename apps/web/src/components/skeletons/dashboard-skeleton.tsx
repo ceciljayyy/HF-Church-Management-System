@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { LAYOUT } from '@/lib/layout-constants';
 import { ChartSkeleton } from './chart-skeleton';
 import { PageHeaderSkeleton } from './page-header-skeleton';
 import { StatCardGridSkeleton, StatCardSkeleton } from './stat-card-skeleton';
@@ -42,7 +43,11 @@ export function DashboardSkeleton({ includeRightPanel = false }: { includeRightP
 
 export function DashboardRightPanelSkeleton() {
   return (
-    <aside className="hidden w-80 shrink-0 space-y-6 border-l border-border bg-surface/90 px-5 py-1 xl:block" aria-hidden="true">
+    <aside
+      style={{ width: LAYOUT.rightPanel }}
+      className="fixed inset-y-0 right-0 z-30 hidden h-screen shrink-0 space-y-6 overflow-y-auto overflow-x-hidden overscroll-contain border-l border-border bg-surface/90 px-5 py-6 pb-8 xl:block"
+      aria-hidden="true"
+    >
       {Array.from({ length: 2 }).map((_, section) => (
         <section key={section} className="rounded-lg border border-border bg-card p-5">
           <div className="mb-4 flex items-center justify-between">
