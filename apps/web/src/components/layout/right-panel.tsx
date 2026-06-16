@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { DashboardRightPanelSkeleton } from '@/components/skeletons/dashboard-skeleton';
 import { apiClient } from '@/lib/api-client';
+import { LAYOUT } from '@/lib/layout-constants';
 
 type ActivityItem = {
   id: string;
@@ -57,7 +58,10 @@ export function RightPanel() {
   if (loading) return <DashboardRightPanelSkeleton />;
 
   return (
-    <aside className="hidden w-80 border-l border-border bg-surface/90 px-5 py-6 xl:block">
+    <aside
+      style={{ width: LAYOUT.rightPanel }}
+      className="fixed inset-y-0 right-0 z-30 hidden h-screen overflow-y-auto overflow-x-hidden overscroll-contain border-l border-border bg-surface/90 px-5 py-6 pb-8 xl:block"
+    >
       <div className="space-y-6">
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center justify-between">

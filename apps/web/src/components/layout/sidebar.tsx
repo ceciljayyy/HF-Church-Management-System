@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   Church,
   ClipboardCheck,
   Cog,
@@ -22,7 +20,9 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
+import { LAYOUT } from '@/lib/layout-constants';
 import { cn } from '@/lib/utils';
+import { SidebarToggle } from './sidebar-toggle';
 
 const sections = [
   {
@@ -69,51 +69,62 @@ const sections = [
 ];
 
 export function Sidebar({
-  expanded,
+  mobileOpen,
+  collapsed,
   churchProfile,
-  onToggle,
+  onToggleDesktop,
+  onCloseMobile,
   onNavigate,
 }: {
-  expanded: boolean;
+  mobileOpen: boolean;
+  collapsed: boolean;
   churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
-  onToggle: () => void;
+  onToggleDesktop: () => void;
+  onCloseMobile: () => void;
   onNavigate: () => void;
 }) {
   const pathname = usePathname();
   const churchName = churchProfile?.churchName || 'Church CMS';
   const branchName = churchProfile?.branchName || 'Premium Admin Suite';
+  const showLabels = !collapsed;
 
   return (
     <aside
+      style={{
+        ['--desktop-sidebar-width' as string]: `${collapsed ? LAYOUT.sidebarCollapsed : LAYOUT.sidebarExpanded}px`,
+      }}
       className={cn(
-        'fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-border bg-surface/95 px-3 py-4 backdrop-blur transition-all duration-200 lg:sticky lg:z-20',
-        expanded ? 'w-72 shadow-glow' : 'w-[4.75rem]',
-        'lg:w-72 lg:px-4 lg:py-5 lg:shadow-none',
+        'fixed inset-y-0 left-0 z-50 flex h-screen w-[min(300px,85vw)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface/95 px-3 py-4 shadow-glow backdrop-blur transition-transform duration-200 lg:z-40 lg:w-[var(--desktop-sidebar-width)] lg:translate-x-0 lg:px-4 lg:py-5 lg:shadow-none lg:transition-[width]',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
       )}
     >
-      <div className={cn('mb-5 rounded-lg border border-border bg-card px-3 py-3 shadow-glow lg:px-4 lg:py-4', !expanded && 'lg:px-4')}>
+      <div className="mb-5 rounded-lg border border-border bg-card px-3 py-3 shadow-glow lg:px-4 lg:py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-lime text-sm font-black text-darkGreen">
+          <div className={cn('flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-lime text-sm font-black text-darkGreen', !showLabels && 'lg:hidden')}>
             {churchProfile?.logoUrl ? <img src={churchProfile.logoUrl} alt="" className="h-full w-full object-cover" /> : churchName[0]}
           </div>
-          <div className={cn('min-w-0', !expanded && 'hidden lg:block')}>
+          <div className={cn('min-w-0 flex-1', !showLabels && 'lg:hidden')}>
             <p className="truncate text-sm font-semibold text-primary">{churchName}</p>
             <p className="truncate text-xs text-secondary">{branchName}</p>
           </div>
-          <button
-            type="button"
-            aria-label={expanded ? 'Collapse navigation' : 'Expand navigation'}
-            onClick={onToggle}
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-secondary transition hover:bg-hover hover:text-primary lg:hidden"
-          >
-            {expanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
+          <SidebarToggle
+            expanded={mobileOpen}
+            onClick={onCloseMobile}
+            label="Close navigation"
+            className="ml-auto lg:hidden"
+          />
+          <SidebarToggle
+            expanded={!collapsed}
+            onClick={onToggleDesktop}
+            label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            className={cn('ml-auto hidden lg:inline-flex', !showLabels && 'mx-auto')}
+          />
         </div>
       </div>
-      <nav className="space-y-5 overflow-y-auto pr-1">
+      <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pr-1">
         {sections.map((section) => (
           <div key={section.label}>
-            <p className={cn('mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted', !expanded && 'hidden lg:block')}>
+            <p className={cn('mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted', !showLabels && 'lg:hidden')}>
               {section.label}
             </p>
             <div className="space-y-1">
@@ -129,13 +140,13 @@ export function Sidebar({
                     onClick={onNavigate}
                     className={cn(
                       'flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary lg:px-4',
-                      !expanded && 'justify-center lg:justify-start',
+                      !showLabels && 'lg:justify-center',
                       active &&
                         'bg-lime font-semibold text-darkGreen hover:bg-lime hover:text-darkGreen',
                     )}
                   >
                     <Icon className={cn('h-4 w-4 shrink-0 text-lime', active && 'text-darkGreen')} />
-                    <span className={cn('truncate', !expanded && 'hidden lg:inline')}>{label}</span>
+                    <span className={cn('truncate', !showLabels && 'lg:hidden')}>{label}</span>
                   </Link>
                 );
               })}

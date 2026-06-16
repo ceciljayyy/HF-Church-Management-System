@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { RightPanel } from './right-panel';
+import { LAYOUT } from '@/lib/layout-constants';
 
 export function AppShell({
   user,
@@ -15,30 +16,78 @@ export function AppShell({
   churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
   children: ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const pathname = usePathname();
   const showRightPanel = pathname === '/dashboard';
+  const sidebarWidth = desktopSidebarCollapsed ? LAYOUT.sidebarCollapsed : LAYOUT.sidebarExpanded;
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('sidebar-collapsed');
+    setDesktopSidebarCollapsed(saved === 'true');
+  }, []);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMobileSidebarOpen(false);
+    }
+
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [mobileSidebarOpen]);
+
+  function toggleDesktopSidebar() {
+    setDesktopSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      window.localStorage.setItem('sidebar-collapsed', String(next));
+      return next;
+    });
+  }
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-background text-primary">
+    <div className="h-screen overflow-hidden bg-background text-primary">
       <Sidebar
-        expanded={sidebarOpen}
+        mobileOpen={mobileSidebarOpen}
+        collapsed={desktopSidebarCollapsed}
         churchProfile={churchProfile}
-        onToggle={() => setSidebarOpen((open) => !open)}
-        onNavigate={() => setSidebarOpen(false)}
+        onToggleDesktop={toggleDesktopSidebar}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+        onNavigate={() => setMobileSidebarOpen(false)}
       />
-      <div className="w-[4.75rem] shrink-0 lg:hidden" />
-      {sidebarOpen ? (
+      {mobileSidebarOpen ? (
         <button
           type="button"
           aria-label="Close navigation"
           className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMobileSidebarOpen(false)}
         />
       ) : null}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={user} churchProfile={churchProfile} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
-        <main className="min-w-0 flex-1 px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
+      <div
+        style={{
+          ['--sidebar-offset' as string]: `${sidebarWidth}px`,
+          ['--right-panel-offset' as string]: showRightPanel ? `${LAYOUT.rightPanel}px` : '0px',
+        }}
+        className="flex h-screen min-w-0 flex-col overflow-y-auto overflow-x-hidden transition-[padding] duration-200 lg:pl-[var(--sidebar-offset)] xl:pr-[var(--right-panel-offset)]"
+      >
+        <Topbar
+          user={user}
+          churchProfile={churchProfile}
+          sidebarOpen={mobileSidebarOpen}
+          onToggleSidebar={() => setMobileSidebarOpen((open) => !open)}
+        />
+        <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
       </div>
       {showRightPanel ? <RightPanel /> : null}
     </div>
