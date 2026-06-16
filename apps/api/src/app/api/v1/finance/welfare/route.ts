@@ -4,9 +4,6 @@ import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { toNumber } from '@/lib/finance';
 
-const INITIAL_PAYMENT_AMOUNT = 10;
-const MONTHLY_PAYMENT_AMOUNT = 5;
-
 function monthStart(year: number, month: number) {
   return new Date(year, month - 1, 1);
 }
@@ -38,7 +35,7 @@ export async function GET(req: NextRequest) {
     const start = monthStart(year, month);
     const end = nextMonthStart(year, month);
 
-    const [members, payments] = await Promise.all([
+    const [members, payments, churchProfile] = await Promise.all([
       prisma.member.findMany({
         where: { branchId: session.branchId, status: 'ACTIVE', deletedAt: null },
         include: { person: true },
@@ -49,18 +46,23 @@ export async function GET(req: NextRequest) {
         include: { person: true, receivedBy: true },
         orderBy: { contributionDate: 'desc' },
       }),
+      (prisma as any).churchProfile.findUnique({ where: { branchId: session.branchId } }),
     ]);
+
+    const initialPaymentAmount = toNumber(churchProfile?.welfareInitialPayment) || 10;
+    const monthlyPaymentAmount = toNumber(churchProfile?.welfareMonthlyPayment) || 5;
+    const currency = churchProfile?.currency || 'GHS';
 
     const rows = members.map((member) => {
       const memberPayments = payments.filter((payment) => payment.personId === member.personId || payment.contributorName === memberName(member));
       const currentPayments = memberPayments.filter((payment) => payment.contributionDate >= start && payment.contributionDate < end);
-      const initialPayments = memberPayments.filter((payment) => payment.notes?.includes('INITIAL_PAYMENT') || toNumber(payment.amount) >= INITIAL_PAYMENT_AMOUNT);
+      const initialPayments = memberPayments.filter((payment) => payment.notes?.includes('INITIAL_PAYMENT') || toNumber(payment.amount) >= initialPaymentAmount);
       const hasInitial = initialPayments.length > 0;
       const currentPaid = currentPayments.reduce((total, payment) => total + toNumber(payment.amount), 0);
-      const amountDue = hasInitial ? MONTHLY_PAYMENT_AMOUNT : INITIAL_PAYMENT_AMOUNT;
+      const amountDue = hasInitial ? monthlyPaymentAmount : initialPaymentAmount;
       const balance = Math.max(amountDue - currentPaid, 0);
       const monthsSinceJoined = Math.max(0, (year - member.createdAt.getFullYear()) * 12 + (month - member.createdAt.getMonth() - 1));
-      const arrears = Math.max(0, monthsSinceJoined * MONTHLY_PAYMENT_AMOUNT - memberPayments.reduce((total, payment) => total + toNumber(payment.amount), 0));
+      const arrears = Math.max(0, monthsSinceJoined * monthlyPaymentAmount - memberPayments.reduce((total, payment) => total + toNumber(payment.amount), 0));
       const status = arrears > 0 && hasInitial ? 'ARREARS' : statusFor(balance, currentPaid, hasInitial);
 
       return {
@@ -86,10 +88,10 @@ export async function GET(req: NextRequest) {
     const monthlyPaymentsCollected = payments.filter((payment) => payment.notes?.includes('MONTHLY_PAYMENT')).reduce((total, payment) => total + toNumber(payment.amount), 0);
 
     return success({
-      setting: { initialPaymentAmount: INITIAL_PAYMENT_AMOUNT, monthlyPaymentAmount: MONTHLY_PAYMENT_AMOUNT, currency: 'GHS', effectiveDate: start },
+      setting: { initialPaymentAmount, monthlyPaymentAmount, currency, effectiveDate: start },
       summary: {
         totalWelfareCollectedThisMonth,
-        expectedWelfareThisMonth: members.length * MONTHLY_PAYMENT_AMOUNT,
+        expectedWelfareThisMonth: members.length * monthlyPaymentAmount,
         membersPaidThisMonth: rows.filter((row) => row.currentMonthStatus === 'PAID').length,
         membersUnpaidThisMonth: rows.filter((row) => row.currentMonthStatus === 'UNPAID' || row.currentMonthStatus === 'INITIAL_DUE').length,
         membersInArrears: rows.filter((row) => row.status === 'ARREARS').length,

@@ -179,6 +179,7 @@ model Branch {
   pledgePayments     PledgePayment[]
   receipts           Receipt[]
   settings           Setting[]
+  churchProfile      ChurchProfile?
   auditLogs          AuditLog[]
   activityLogs       ActivityLog[]
 
@@ -211,9 +212,65 @@ model User {
   pledgePaymentsReceived    PledgePayment[]     @relation("PledgePaymentReceivedBy")
   auditLogs                 AuditLog[]
   activityLogs              ActivityLog[]
+  churchProfilesCreated     ChurchProfile[]     @relation("ChurchProfileCreatedBy")
+  churchProfilesUpdated     ChurchProfile[]     @relation("ChurchProfileUpdatedBy")
 
   @@index([branchId])
   @@index([status])
+}
+
+model ChurchProfile {
+  id                              String    @id @default(cuid())
+  branchId                        String    @unique
+  churchName                      String
+  branchName                      String?
+  denomination                    String?
+  slogan                          String?
+  website                         String?
+  logoUrl                         String?
+  phone                           String
+  alternatePhone                  String?
+  email                           String
+  adminContactName                String
+  adminContactPhone               String
+  adminContactEmail               String?
+  seniorPastorName                String?
+  streetAddress                   String?
+  city                            String
+  stateOrRegion                   String?
+  postalCode                      String?
+  country                         String    @default("Ghana")
+  latitude                        Float?
+  longitude                       Float?
+  mapProvider                     String?
+  language                        String    @default("English")
+  timezone                        String    @default("Africa/Accra")
+  distanceUnit                    String    @default("kilometers")
+  currency                        String    @default("GHS")
+  dateFormat                      String    @default("DD/MM/YYYY")
+  defaultCity                     String?
+  defaultStateOrRegion            String?
+  defaultPostalCode               String?
+  defaultCountry                  String    @default("Ghana")
+  defaultServiceDay               String    @default("Sunday")
+  defaultServiceTime              String    @default("09:00")
+  enableChildrenServiceAttendance Boolean   @default(true)
+  enableVehicleCount              Boolean   @default(true)
+  welfareInitialPayment           Decimal   @default(10) @db.Decimal(14, 2)
+  welfareMonthlyPayment           Decimal   @default(5) @db.Decimal(14, 2)
+  onboardingCompleted             Boolean   @default(false)
+  onboardingCompletedAt           DateTime?
+  createdById                     String?
+  updatedById                     String?
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("ChurchProfileCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?  @relation("ChurchProfileUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([churchName])
+  @@index([onboardingCompleted])
 }
 
 model Role {

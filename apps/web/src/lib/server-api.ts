@@ -72,6 +72,18 @@ export const serverApi = {
 
   getDashboardSummary: () => request<any>('/dashboard/summary'),
 
+  getOnboardingStatus: () =>
+    request<{
+      onboardingCompleted: boolean;
+      churchProfileExists: boolean;
+      churchProfile: any | null;
+    }>('/onboarding/status'),
+
+  getChurchProfile: () =>
+    request<{
+      churchProfile: any | null;
+    }>('/church-profile'),
+
   listResource: (
     resource: string,
     searchParams?: Record<string, string | number | undefined>,

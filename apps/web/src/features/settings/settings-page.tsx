@@ -112,7 +112,7 @@ export function SettingsPageClient({ user }: { user: any }) {
               <button
                 key={item}
                 type="button"
-                onClick={() => item === 'Logout' ? logout() : setActive(item)}
+                onClick={() => item === 'Logout' ? logout() : item === 'Church Profile' ? router.push('/settings/church-profile') : setActive(item)}
                 className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${active === item ? 'bg-lime font-semibold text-darkGreen' : 'text-secondary hover:bg-hover hover:text-primary'}`}
               >
                 {item}
@@ -180,7 +180,6 @@ export function SettingsPageClient({ user }: { user: any }) {
             </form>
           ) : null}
           {active === 'Language and Region' ? <RegionForm onSubmit={save} /> : null}
-          {active === 'Church Profile' ? <ChurchForm onSubmit={save} /> : null}
           {active === 'System Preferences' ? <SystemPreferencesForm onSubmit={save} /> : null}
           {active === 'Data and Privacy' ? <Placeholder title="Data and Privacy" lines={['Export data placeholder', 'Backup database placeholder', 'Delete account placeholder', 'Privacy policy placeholder']} /> : null}
         </section>
@@ -199,10 +198,6 @@ function SettingsForm({ onSubmit, fields, extra }: { onSubmit: (event: FormEvent
 
 function RegionForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Language"><input name="language" className={inputClass} defaultValue="English" /></Field><Field label="Country"><input name="country" className={inputClass} defaultValue="Ghana" /></Field><Field label="Time zone"><input name="timeZone" className={inputClass} defaultValue="Africa/Accra" /></Field><Field label="Currency"><input name="currency" className={inputClass} defaultValue="GHS" /></Field><Field label="Date format"><input name="dateFormat" className={inputClass} defaultValue="DD/MM/YYYY" /></Field></div><SaveActions /></form>;
-}
-
-function ChurchForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Church name"><input name="churchName" className={inputClass} /></Field><Field label="Branch name"><input name="branchName" className={inputClass} /></Field><Field label="Church email"><input name="churchEmail" className={inputClass} /></Field><Field label="Church phone"><input name="churchPhone" className={inputClass} /></Field><Field label="Address"><input name="address" className={inputClass} /></Field><Field label="City"><input name="city" className={inputClass} /></Field><Field label="Country"><input name="country" className={inputClass} defaultValue="Ghana" /></Field><Field label="Website"><input name="website" className={inputClass} /></Field></div><SaveActions /></form>;
 }
 
 function SystemPreferencesForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
