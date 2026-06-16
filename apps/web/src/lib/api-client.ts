@@ -40,7 +40,7 @@ export const apiClient = {
   getCurrentUser: () => request<{ user: any }>('/auth/me'),
   login: (payload: { email: string; password: string }) => request<{ user: any }>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => request<{ success: boolean }>('/auth/logout', { method: 'POST' }),
-  getDashboardSummary: () => request<any>('/dashboard/summary'),
+  getDashboardSummary: (scope?: 'cards') => request<any>(`/dashboard/summary${scope ? `?scope=${scope}` : ''}`),
   listResource: (resource: string, searchParams?: Record<string, string | number | undefined>) => {
     const params = new URLSearchParams();
     Object.entries(searchParams ?? {}).forEach(([key, value]) => {

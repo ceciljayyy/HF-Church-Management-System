@@ -1,12 +1,65 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { CalendarDays, HandCoins, HeartPulse, Users, UserPlus } from 'lucide-react';
+import { DashboardSkeleton } from '@/components/skeletons/dashboard-skeleton';
 import { StatCard } from '@/components/ui/stat-card';
 import { DashboardCharts } from '@/components/charts/dashboard-charts';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
+import { apiClient } from '@/lib/api-client';
 import { formatCurrency } from '@/lib/utils';
 
-export function DashboardView({ summary }: { summary: any }) {
+export function DashboardView() {
+  const [summary, setSummary] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSummary() {
+      try {
+        const cards = await apiClient.getDashboardSummary('cards');
+        if (mounted) {
+          setSummary(cards);
+          setError(null);
+        }
+
+        const payload = await apiClient.getDashboardSummary();
+        if (mounted) {
+          setSummary((current: any | null) => ({ ...(current ?? {}), ...payload }));
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load dashboard summary');
+        }
+      }
+    }
+
+    loadSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!summary && !error) return <DashboardSkeleton />;
+
+  if (!summary) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Track attendance, finance, groups, events, and ministry activity across every branch in one premium command center."
+        />
+        <div className="rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   const upcomingEvents = summary.upcomingEvents ?? [];
   const recentActivities = summary.recentActivities ?? [];
   const groupStats = summary.groupStats ?? [];
