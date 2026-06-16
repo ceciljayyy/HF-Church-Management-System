@@ -6,9 +6,11 @@ import { Avatar } from '@/components/ui/avatar';
 
 export function Topbar({
   user,
+  churchProfile,
   onToggleSidebar,
 }: {
   user: { name: string; email: string; branchName?: string };
+  churchProfile?: { churchName?: string; branchName?: string | null } | null;
   onToggleSidebar: () => void;
 }) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -40,9 +42,11 @@ export function Topbar({
         </button>
         <div className="min-w-0">
           <p className="hidden truncate text-xs uppercase tracking-[0.24em] text-secondary sm:block">
-            Sunday Service Operations
+            {churchProfile?.churchName ?? 'Sunday Service Operations'}
           </p>
-          <h2 className="truncate text-base font-semibold text-primary sm:mt-1 sm:text-lg">Welcome back, {user.name}</h2>
+          <h2 className="truncate text-base font-semibold text-primary sm:mt-1 sm:text-lg">
+            Welcome back, {user.name}
+          </h2>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -65,7 +69,7 @@ export function Topbar({
           <div className="hidden max-w-44 text-right md:block">
             <p className="text-sm font-medium text-primary">{user.name}</p>
             <p className="truncate text-xs text-secondary">{user.email}</p>
-            {user.branchName ? <p className="text-xs text-lime">{user.branchName}</p> : null}
+            {churchProfile?.branchName || user.branchName ? <p className="text-xs text-lime">{churchProfile?.branchName ?? user.branchName}</p> : null}
           </div>
         </div>
       </div>

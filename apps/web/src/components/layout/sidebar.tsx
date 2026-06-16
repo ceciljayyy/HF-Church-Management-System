@@ -70,14 +70,18 @@ const sections = [
 
 export function Sidebar({
   expanded,
+  churchProfile,
   onToggle,
   onNavigate,
 }: {
   expanded: boolean;
+  churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
   onToggle: () => void;
   onNavigate: () => void;
 }) {
   const pathname = usePathname();
+  const churchName = churchProfile?.churchName || 'Church CMS';
+  const branchName = churchProfile?.branchName || 'Premium Admin Suite';
 
   return (
     <aside
@@ -89,12 +93,12 @@ export function Sidebar({
     >
       <div className={cn('mb-5 rounded-lg border border-border bg-card px-3 py-3 shadow-glow lg:px-4 lg:py-4', !expanded && 'lg:px-4')}>
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-lime text-sm font-black text-darkGreen">
-            C
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg bg-lime text-sm font-black text-darkGreen">
+            {churchProfile?.logoUrl ? <img src={churchProfile.logoUrl} alt="" className="h-full w-full object-cover" /> : churchName[0]}
           </div>
           <div className={cn('min-w-0', !expanded && 'hidden lg:block')}>
-            <p className="text-sm font-semibold text-primary">Church CMS</p>
-            <p className="text-xs text-secondary">Premium Admin Suite</p>
+            <p className="truncate text-sm font-semibold text-primary">{churchName}</p>
+            <p className="truncate text-xs text-secondary">{branchName}</p>
           </div>
           <button
             type="button"

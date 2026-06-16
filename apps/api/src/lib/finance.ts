@@ -55,6 +55,7 @@ export async function getFinanceOverview(branchId?: string | null) {
     contributionHistory,
     expenseHistory,
     activeMembers,
+    churchProfile,
   ] = await Promise.all([
     prisma.contribution.aggregate({
       _sum: { amount: true },
@@ -115,6 +116,7 @@ export async function getFinanceOverview(branchId?: string | null) {
       select: { expenseDate: true, amount: true, category: true },
     }),
     prisma.member.count({ where: { ...branchFilter, status: 'ACTIVE', deletedAt: null } }),
+    branchId ? (prisma as any).churchProfile.findUnique({ where: { branchId } }) : Promise.resolve(null),
   ]);
 
   const totalGivingThisMonth = toNumber(contributionTotal._sum.amount);
@@ -207,7 +209,8 @@ export async function getFinanceOverview(branchId?: string | null) {
 
   const totalFundContributions = fundSummaries.reduce((total, fund) => total + fund.amountCollected, 0);
   const activeFunds = fundSummaries.filter((fund) => fund.status === 'ACTIVE').length;
-  const welfareArrears = Math.max(activeMembers * 5 - totalWelfareCollectedThisMonth, 0);
+  const welfareMonthlyPayment = toNumber(churchProfile?.welfareMonthlyPayment) || 5;
+  const welfareArrears = Math.max(activeMembers * welfareMonthlyPayment - totalWelfareCollectedThisMonth, 0);
 
   return {
     totalWelfareCollectedThisMonth,
@@ -220,8 +223,8 @@ export async function getFinanceOverview(branchId?: string | null) {
     expensesTrend,
     fundContributionsByFundType,
     welfarePaidVsUnpaid: [
-      { name: 'Paid', value: Math.floor(totalWelfareCollectedThisMonth / 5) },
-      { name: 'Unpaid', value: Math.max(activeMembers - Math.floor(totalWelfareCollectedThisMonth / 5), 0) },
+      { name: 'Paid', value: Math.floor(totalWelfareCollectedThisMonth / welfareMonthlyPayment) },
+      { name: 'Unpaid', value: Math.max(activeMembers - Math.floor(totalWelfareCollectedThisMonth / welfareMonthlyPayment), 0) },
     ],
     totalGivingThisMonth,
     contributions: totalGivingThisMonth,

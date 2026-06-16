@@ -6,14 +6,27 @@ import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { RightPanel } from './right-panel';
 
-export function AppShell({ user, children }: { user: { name: string; email: string; branchName?: string }; children: ReactNode }) {
+export function AppShell({
+  user,
+  churchProfile,
+  children,
+}: {
+  user: { name: string; email: string; branchName?: string };
+  churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
+  children: ReactNode;
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const showRightPanel = pathname === '/dashboard';
 
   return (
     <div className="flex min-h-screen overflow-x-hidden bg-background text-primary">
-      <Sidebar expanded={sidebarOpen} onToggle={() => setSidebarOpen((open) => !open)} onNavigate={() => setSidebarOpen(false)} />
+      <Sidebar
+        expanded={sidebarOpen}
+        churchProfile={churchProfile}
+        onToggle={() => setSidebarOpen((open) => !open)}
+        onNavigate={() => setSidebarOpen(false)}
+      />
       <div className="w-[4.75rem] shrink-0 lg:hidden" />
       {sidebarOpen ? (
         <button
@@ -24,7 +37,7 @@ export function AppShell({ user, children }: { user: { name: string; email: stri
         />
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={user} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
+        <Topbar user={user} churchProfile={churchProfile} onToggleSidebar={() => setSidebarOpen((open) => !open)} />
         <main className="min-w-0 flex-1 px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
       </div>
       {showRightPanel ? <RightPanel /> : null}
