@@ -2,14 +2,89 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
-import { getFinanceOverview } from '@/lib/finance';
+import { getFinanceOverview, toNumber } from '@/lib/finance';
 import { buildAttendanceOverview } from '@/lib/attendance';
+
+async function getDashboardCards(branchId?: string | null) {
+  const branchFilter = branchId ? { branchId } : {};
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [
+    peopleTotal,
+    newPeopleThisMonth,
+    attendanceToday,
+    contributionTotal,
+    welfareTotal,
+    expenseTotal,
+    pendingExpenseApprovals,
+    activeFundCampaigns,
+    activeMembers,
+    churchProfile,
+    attendanceOverview,
+  ] = await Promise.all([
+    prisma.person.count({ where: { ...branchFilter, deletedAt: null } }),
+    prisma.person.count({ where: { ...branchFilter, deletedAt: null, createdAt: { gte: startOfMonth } } }),
+    prisma.attendanceRecord.count({
+      where: {
+        checkedInAt: { gte: startOfToday },
+        session: branchId ? { branchId } : undefined,
+      },
+    }),
+    prisma.contribution.aggregate({
+      _sum: { amount: true },
+      where: { ...branchFilter, deletedAt: null, contributionDate: { gte: startOfMonth } },
+    }),
+    prisma.contribution.aggregate({
+      _sum: { amount: true },
+      where: { ...branchFilter, deletedAt: null, type: 'OTHER', notes: { contains: 'financeKind=WELFARE' }, contributionDate: { gte: startOfMonth } },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { ...branchFilter, deletedAt: null, expenseDate: { gte: startOfMonth } },
+    }),
+    prisma.expense.count({ where: { ...branchFilter, deletedAt: null, status: 'PENDING' } }),
+    prisma.financialFund.count({ where: { ...branchFilter, status: 'ACTIVE' } }),
+    prisma.member.count({ where: { ...branchFilter, status: 'ACTIVE', deletedAt: null } }),
+    branchId ? (prisma as any).churchProfile.findUnique({ where: { branchId } }) : Promise.resolve(null),
+    branchId ? buildAttendanceOverview(branchId) : Promise.resolve(null),
+  ]);
+
+  const totalGivingThisMonth = toNumber(contributionTotal._sum.amount);
+  const welfareCollectedThisMonth = toNumber(welfareTotal._sum.amount);
+  const expenses = toNumber(expenseTotal._sum.amount);
+  const welfareMonthlyPayment = toNumber(churchProfile?.welfareMonthlyPayment) || 5;
+
+  return {
+    peopleTotal,
+    activePeople: peopleTotal,
+    newPeopleThisMonth,
+    attendanceToday,
+    latestPeopleAttendance: attendanceOverview?.peopleAttendanceToday ?? 0,
+    mainServiceAttendance: attendanceOverview?.cards.main.latestTotal ?? 0,
+    childrenServiceAttendance: attendanceOverview?.cards.children.latestTotal ?? 0,
+    vehiclesCount: attendanceOverview?.vehiclesToday ?? 0,
+    welfareCollectedThisMonth,
+    welfareArrears: Math.max(activeMembers * welfareMonthlyPayment - welfareCollectedThisMonth, 0),
+    fundContributionsThisMonth: totalGivingThisMonth - welfareCollectedThisMonth,
+    expenses,
+    netBalance: totalGivingThisMonth - expenses,
+    pendingExpenseApprovals,
+    activeFundCampaigns,
+  };
+}
 
 export async function GET(_req: NextRequest) {
   try {
     const token = getTokenFromRequest(_req);
     if (!token) return failure('Unauthorized', 401);
     const session = await verifySessionToken(token);
+    if (_req.nextUrl.searchParams.get('scope') === 'cards') {
+      return success(await getDashboardCards(session.branchId));
+    }
+
     const branchFilter = session?.branchId ? { branchId: session.branchId } : {};
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

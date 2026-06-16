@@ -4,9 +4,12 @@ import { AppShell } from '@/components/layout/app-shell';
 import { serverApi } from '@/lib/server-api';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const user = await serverApi.getCurrentUser();
+  const [user, status] = await Promise.all([
+    serverApi.getCurrentUser(),
+    serverApi.getOnboardingStatus(),
+  ]);
+
   if (!user) redirect('/login');
-  const status = await serverApi.getOnboardingStatus();
   if (!status.onboardingCompleted) redirect('/onboarding/church');
 
   return (
