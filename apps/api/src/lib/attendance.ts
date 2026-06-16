@@ -162,10 +162,27 @@ export function summarizeAttendance(section: AttendanceSection, records: Attenda
 }
 
 export async function buildAttendanceOverview(branchId: string) {
-  const [sections, records] = await Promise.all([getAttendanceSections(branchId), getAttendanceRecords(branchId)]);
-  const main = summarizeAttendance(sections.find((section) => section.id === 'main-service')!, records);
-  const children = summarizeAttendance(sections.find((section) => section.id === 'children-service')!, records);
-  const vehicles = summarizeAttendance(sections.find((section) => section.id === 'vehicles')!, records);
+  const [allSections, records, churchProfile] = await Promise.all([
+    getAttendanceSections(branchId),
+    getAttendanceRecords(branchId),
+    (prisma as any).churchProfile.findUnique({ where: { branchId } }),
+  ]);
+  const sections = allSections.filter((section) => {
+    if (section.id === 'children-service' && churchProfile?.enableChildrenServiceAttendance === false) return false;
+    if (section.id === 'vehicles' && churchProfile?.enableVehicleCount === false) return false;
+    return true;
+  });
+  const main = summarizeAttendance(allSections.find((section) => section.id === 'main-service')!, records);
+  const childrenSection = allSections.find((section) => section.id === 'children-service')!;
+  const vehiclesSection = allSections.find((section) => section.id === 'vehicles')!;
+  const children =
+    churchProfile?.enableChildrenServiceAttendance === false
+      ? { ...summarizeAttendance(childrenSection, []), records: [], latest: null, latestTotal: 0, average: 0, highest: 0, lowest: 0, trend: [] }
+      : summarizeAttendance(childrenSection, records);
+  const vehicles =
+    churchProfile?.enableVehicleCount === false
+      ? { ...summarizeAttendance(vehiclesSection, []), records: [], latest: null, latestTotal: 0, average: 0, highest: 0, lowest: 0, trend: [] }
+      : summarizeAttendance(vehiclesSection, records);
   const customSections = sections.filter((section) => !section.isDefault);
   const peopleRecords = records.filter((record) => record.sectionSlug !== 'vehicles');
   const thisMonth = new Date();
