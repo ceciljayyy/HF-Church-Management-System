@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { invalidateDepartmentCache } from '@/lib/cache-invalidation';
 
 async function parseJson(req: NextRequest) {
   try {
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
     include: { person: true, group: true },
   });
   await syncLeader(groupId, personId, role, session.branchId);
+  await invalidateDepartmentCache(session.branchId);
 
   return success({ item }, 201);
 }
@@ -117,6 +119,7 @@ export async function PATCH(req: NextRequest) {
     });
   }
 
+  await invalidateDepartmentCache(session.branchId);
   return success({ item });
 }
 
@@ -133,6 +136,7 @@ export async function DELETE(req: NextRequest) {
 
   await prisma.groupMember.delete({ where: { id } });
   if (existing.role === 'HEAD') await prisma.group.update({ where: { id: existing.groupId }, data: { leaderId: null } });
+  await invalidateDepartmentCache(session.branchId);
 
   return success({ deleted: true });
 }

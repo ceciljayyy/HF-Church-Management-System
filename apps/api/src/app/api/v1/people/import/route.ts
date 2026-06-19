@@ -4,6 +4,7 @@ import { importPeopleRowSchema } from '@church/shared';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { writeActivityLog, writeAuditLog } from '@/lib/audit';
+import { invalidatePeopleCache } from '@/lib/cache-invalidation';
 import {
   canImportPeople,
   createPersonWithMembership,
@@ -120,6 +121,8 @@ export async function POST(req: NextRequest) {
       description: `${imported} imported, ${skipped} skipped, ${duplicates} duplicates.`,
       type: 'people.import',
     });
+
+    if (imported > 0) await invalidatePeopleCache(branchId);
 
     return success({
       totalRows: rows.length,

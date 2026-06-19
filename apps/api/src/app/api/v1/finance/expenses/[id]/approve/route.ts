@@ -4,6 +4,7 @@ import { failure, success } from '@/lib/http';
 import { logFinanceActivity } from '@/lib/finance';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
+import { invalidateReportsCache } from '@/lib/cache-invalidation';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       newValue: { status: item.status, approvedById: item.approvedById },
       ...auditMetaFromRequest(req),
     });
+    await invalidateReportsCache(session.branchId);
     return success({ item });
   } catch {
     return failure('Unable to approve expense', 500);

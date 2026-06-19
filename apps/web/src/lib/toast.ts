@@ -25,11 +25,3 @@ export function showInfoToast(message: string) {
 export function showWarningToast(message: string) {
   return toast.warning(message, { duration: 4000 });
 }
-
-export function showLoadingToast(message: string) {
-  return toast.loading(message);
-}
-
-export function dismissToast(id?: string | number) {
-  toast.dismiss(id);
-}
