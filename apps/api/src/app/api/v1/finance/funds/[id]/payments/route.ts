@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
+import { invalidateReportsCache } from '@/lib/cache-invalidation';
 
 const fundPaymentSchema = z.object({
   contributorId: z.string().optional().nullable(),
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     });
 
     await logFinanceActivity(session.branchId, session.userId, 'Fund contribution received', `${item.currency} ${body.amount.toFixed(2)} received for ${fund.name}.`, 'FINANCE_FUND_PAYMENT');
+    await invalidateReportsCache(session.branchId);
     return success({ item }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());

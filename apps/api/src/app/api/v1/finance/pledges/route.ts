@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
 import { logFinanceActivity, makeNumber, normalizeDate, toNumber } from '@/lib/finance';
+import { invalidateReportsCache } from '@/lib/cache-invalidation';
 
 const pledgeSchema = z.object({
   title: z.string().min(1),
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     });
 
     await logFinanceActivity(session.branchId, session.userId, 'Pledge created', `${item.contributorName} pledged ${item.currency} ${body.targetAmount.toFixed(2)} for ${item.fund?.name ?? item.title}.`, 'FINANCE_PLEDGE');
+    await invalidateReportsCache(session.branchId);
     return success({ item }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());

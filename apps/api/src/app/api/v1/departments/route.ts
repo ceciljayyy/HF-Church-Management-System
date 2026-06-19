@@ -2,6 +2,9 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { getCacheVersion, getOrSetCache } from '@/lib/cache';
+import { cacheKeys } from '@/lib/cache-keys';
+import { invalidateDepartmentCache } from '@/lib/cache-invalidation';
 
 async function parseJson(req: NextRequest) {
   try {
@@ -29,21 +32,27 @@ export async function GET(req: NextRequest) {
 
   if (status) where.status = status;
   if (search) where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }];
+  const version = await getCacheVersion(cacheKeys.departmentsVersion(session.branchId));
 
   if (id) {
-    const [item, transferSetting] = await Promise.all([
-      prisma.group.findFirst({
-        where: { id, branchId: session.branchId, type: 'DEPARTMENT', deletedAt: null },
-        include: {
-          leader: true,
-          members: {
-            orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-            include: { person: true },
-          },
-        },
-      }),
-      prisma.setting.findUnique({ where: { branchId_key: { branchId: session.branchId, key: 'departments.transferHistory' } } }),
-    ]);
+    const [item, transferSetting] = await getOrSetCache<[any, any]>(
+      cacheKeys.departmentDetail(session.branchId, version, id),
+      180,
+      () =>
+        Promise.all([
+          prisma.group.findFirst({
+            where: { id, branchId: session.branchId, type: 'DEPARTMENT', deletedAt: null },
+            include: {
+              leader: true,
+              members: {
+                orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+                include: { person: true },
+              },
+            },
+          }),
+          prisma.setting.findUnique({ where: { branchId_key: { branchId: session.branchId, key: 'departments.transferHistory' } } }),
+        ]) as any,
+    );
     if (!item) return failure('Department not found', 404);
     const transfers = Array.isArray(transferSetting?.value)
       ? transferSetting.value.filter((transfer: any) => transfer.fromDepartmentId === id || transfer.toDepartmentId === id)
@@ -51,19 +60,24 @@ export async function GET(req: NextRequest) {
     return success({ item: { ...item, transferHistory: transfers } });
   }
 
-  const [items, total] = await Promise.all([
-    prisma.group.findMany({
-      where,
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { name: 'asc' },
-      include: {
-        leader: true,
-        _count: { select: { members: true } },
-      },
-    }),
-    prisma.group.count({ where }),
-  ]);
+  const [items, total] = await getOrSetCache<[any[], number]>(
+    cacheKeys.departmentsList(session.branchId, version, { page, limit, search, status: status ?? '' }),
+    600,
+    () =>
+      Promise.all([
+        prisma.group.findMany({
+          where,
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { name: 'asc' },
+          include: {
+            leader: true,
+            _count: { select: { members: true } },
+          },
+        }),
+        prisma.group.count({ where }),
+      ]) as any,
+  );
 
   return success({ items, pagination: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) } });
 }
@@ -86,6 +100,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await invalidateDepartmentCache(session.branchId);
   return success({ item }, 201);
 }
 
@@ -109,5 +124,6 @@ export async function PATCH(req: NextRequest) {
     },
   });
 
+  await invalidateDepartmentCache(session.branchId);
   return success({ item });
 }

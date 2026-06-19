@@ -364,6 +364,10 @@ model Person {
 
   @@index([branchId])
   @@index([firstName, lastName])
+  @@index([lastName])
+  @@index([classification])
+  @@index([createdAt])
+  @@index([deletedAt])
 }
 
 model Member {
@@ -443,7 +447,9 @@ model Group {
 
   @@unique([branchId, name])
   @@index([branchId])
+  @@index([name])
   @@index([status])
+  @@index([type])
 }
 
 model GroupMember {
@@ -485,6 +491,7 @@ model Event {
   @@unique([branchId, title, startDateTime])
   @@index([branchId])
   @@index([status])
+  @@index([startDateTime])
 }
 
 model AttendanceSession {
@@ -524,6 +531,7 @@ model AttendanceRecord {
   @@unique([sessionId, personId])
   @@index([sessionId])
   @@index([personId])
+  @@index([checkedInAt])
 }
 
 model FinancialFund {

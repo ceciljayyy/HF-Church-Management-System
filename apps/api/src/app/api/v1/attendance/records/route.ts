@@ -23,7 +23,17 @@ async function getSession(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
-  return success({ items: await getAttendanceRecords(session.branchId) });
+  const url = new URL(req.url);
+  const sourceType = url.searchParams.get('sourceType');
+  const eventId = url.searchParams.get('eventId');
+  const records = await getAttendanceRecords(session.branchId);
+  return success({
+    items: records.filter((record) => {
+      if (sourceType && record.sourceType !== sourceType) return false;
+      if (eventId && record.eventId !== eventId) return false;
+      return true;
+    }),
+  });
 }
 
 export async function POST(req: NextRequest) {

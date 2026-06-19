@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+import { invalidateAttendanceCache } from './cache-invalidation';
 
 export type AttendanceField = {
   id: string;
@@ -31,10 +32,13 @@ export type AttendanceRecord = {
   sectionId: string;
   sectionName: string;
   sectionSlug: string;
+  sourceType?: string;
+  eventId?: string;
   serviceTitle: string;
   attendanceDate: string;
   values: Record<string, unknown>;
   total: number;
+  totalVehicles?: number;
   notes?: string;
   recordedById?: string | null;
   recordedByName?: string;
@@ -119,6 +123,7 @@ export async function saveCustomAttendanceSections(branchId: string, sections: A
     update: { value: sections as unknown as Prisma.InputJsonValue },
     create: { branchId, key: 'attendance.sections', value: sections as unknown as Prisma.InputJsonValue, type: 'JSON' },
   });
+  await invalidateAttendanceCache(branchId);
 }
 
 export async function getAttendanceRecords(branchId: string) {
@@ -132,6 +137,7 @@ export async function saveAttendanceRecords(branchId: string, records: Attendanc
     update: { value: records as unknown as Prisma.InputJsonValue },
     create: { branchId, key: 'attendance.records', value: records as unknown as Prisma.InputJsonValue, type: 'JSON' },
   });
+  await invalidateAttendanceCache(branchId);
 }
 
 export function calculateAttendanceTotal(section: AttendanceSection, values: Record<string, unknown>) {

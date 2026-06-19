@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { hasPermission } from '@/lib/rbac';
 import { writeAuditLog, writeActivityLog } from '@/lib/audit';
+import { getCacheVersion, getOrSetCache } from '@/lib/cache';
+import { cacheKeys } from '@/lib/cache-keys';
+import { invalidatePeopleCache } from '@/lib/cache-invalidation';
 import {
   auditPersonCreate,
   canCreatePeople,
@@ -57,18 +60,36 @@ export async function GET(req: NextRequest) {
       where.classification = { equals: query.classification, mode: 'insensitive' };
     }
 
+    const params = {
+      page: query.page,
+      limit: query.limit,
+      status: query.status ?? 'active',
+      search: query.search ?? '',
+      classification: query.classification ?? '',
+    };
+    const version = await getCacheVersion(cacheKeys.peopleVersion(branchId));
+
     const [items, total] = await Promise.all([
-      prisma.person.findMany({
-        where,
-        include: {
-          member: true,
-          familyMembers: { include: { family: true }, take: 1 },
-        },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.person.count({ where }),
+      getOrSetCache<any[]>(
+        cacheKeys.peopleList(branchId, version, params),
+        120,
+        () =>
+          prisma.person.findMany({
+            where,
+            include: {
+              member: true,
+              familyMembers: { include: { family: true }, take: 1 },
+            },
+            skip: (query.page - 1) * query.limit,
+            take: query.limit,
+            orderBy: { createdAt: 'desc' },
+          }) as any,
+      ),
+      getOrSetCache<number>(
+        cacheKeys.peopleCount(branchId, version, params),
+        120,
+        () => prisma.person.count({ where }) as any,
+      ),
     ]);
 
     return success({
@@ -96,6 +117,7 @@ export async function POST(req: NextRequest) {
     const branchId = await requireBranchId(session.branchId);
     const person = await createPersonWithMembership(input, branchId);
     await auditPersonCreate(req, branchId, session.userId, person);
+    await invalidatePeopleCache(branchId);
     return success({ item: person }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());
@@ -142,6 +164,7 @@ export async function PATCH(req: NextRequest) {
       userAgent: req.headers.get('user-agent'),
     });
 
+    await invalidatePeopleCache(branchId);
     return success({ item: updated });
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());
@@ -176,6 +199,7 @@ export async function DELETE(req: NextRequest) {
         ipAddress: req.headers.get('x-forwarded-for'),
         userAgent: req.headers.get('user-agent'),
       });
+      await invalidatePeopleCache(branchId);
       return success({ deleted: true });
     }
 
@@ -204,6 +228,7 @@ export async function DELETE(req: NextRequest) {
       type: 'people.archive',
     });
 
+    await invalidatePeopleCache(branchId);
     return success({ item: archived });
   } catch (error) {
     return failure('Unable to remove person', 500, error);
