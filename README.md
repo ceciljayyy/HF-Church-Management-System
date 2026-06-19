@@ -127,3 +127,29 @@ church-management-system/
 ├── .env.example          # Example environment variables
 ├── package.json
 └── README.md
+```
+
+---
+
+## Redis Caching
+
+Redis is an optional cache layer for repeated backend reads. PostgreSQL remains the permanent source of truth.
+
+Configure Upstash Redis in the API environment when caching is wanted:
+
+```bash
+UPSTASH_REDIS_REST_URL=""
+UPSTASH_REDIS_REST_TOKEN=""
+```
+
+Leaving either value blank disables Redis. The API will continue to read directly from the database and Redis errors are ignored after development logging.
+
+Cached backend data:
+- Dashboard cards and summary: 60 seconds.
+- People list pages and counts: 120 seconds, keyed by branch, page, limit, status, search, and classification.
+- Department list: 600 seconds.
+- Department detail and member data: 180 seconds.
+- Attendance overview: 300 seconds.
+- Reports summary: 900 seconds.
+
+Invalidation uses versioned cache keys instead of wildcard deletes. Successful people, department, attendance, event, and finance mutations bump the related namespace version so new reads bypass stale keys while old keys expire naturally.
