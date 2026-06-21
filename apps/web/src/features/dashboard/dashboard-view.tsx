@@ -1,48 +1,71 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, HandCoins, HeartPulse, Users, UserPlus } from 'lucide-react';
 import { DashboardSkeleton } from '@/components/skeletons/dashboard-skeleton';
 import { StatCard } from '@/components/ui/stat-card';
-import { DashboardCharts } from '@/components/charts/dashboard-charts';
+import { ChartCard } from '@/components/charts/chart-card';
+import { AttendanceTrendChart } from '@/components/charts/attendance-trend-chart';
+import { DepartmentMembersChart } from '@/components/charts/department-members-chart';
+import { EventsAttendanceChart } from '@/components/charts/events-attendance-chart';
+import { FinanceTrendChart } from '@/components/charts/finance-trend-chart';
+import { IncomeExpensesChart } from '@/components/charts/income-expenses-chart';
+import { MiniSparklineChart } from '@/components/charts/mini-sparkline-chart';
+import { PeopleDistributionChart } from '@/components/charts/people-distribution-chart';
+import { TaskCompletionChart } from '@/components/charts/task-completion-chart';
 import { PageHeader } from '@/components/ui/page-header';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
+import { useDashboardRefreshListener } from '@/lib/dashboard-refresh';
+import { showErrorToast } from '@/lib/toast';
 import { formatCurrency } from '@/lib/utils';
 
 export function DashboardView() {
   const [summary, setSummary] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadSummary = useCallback(async (shouldUpdate: () => boolean = () => true) => {
+    try {
+      const cards = await apiClient.getDashboardSummary('cards');
+      if (shouldUpdate()) {
+        setSummary((current: any | null) => ({ ...(current ?? {}), ...cards }));
+        setError(null);
+      }
 
-    async function loadSummary() {
       try {
-        const cards = await apiClient.getDashboardSummary('cards');
-        if (mounted) {
-          setSummary(cards);
+        const payload = await apiClient.getDashboardSummary();
+        if (shouldUpdate()) {
+          setSummary((current: any | null) => ({ ...(current ?? {}), ...payload }));
           setError(null);
         }
-
-        const payload = await apiClient.getDashboardSummary();
-        if (mounted) {
-          setSummary((current: any | null) => ({ ...(current ?? {}), ...payload }));
-        }
       } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Unable to load dashboard summary');
+        if (shouldUpdate()) {
+          const message = err instanceof Error ? err.message : 'Unable to load dashboard details';
+          setError(message);
+          showErrorToast(err, 'Unable to load dashboard details.');
         }
       }
+    } catch (err) {
+      if (shouldUpdate()) {
+        const message = err instanceof Error ? err.message : 'Unable to load dashboard summary';
+        setError(message);
+        showErrorToast(err, 'Unable to load dashboard summary.');
+      }
     }
+  }, []);
 
-    loadSummary();
-
+  useEffect(() => {
+    let mounted = true;
+    loadSummary(() => mounted);
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadSummary]);
+
+  useDashboardRefreshListener(() => {
+    void loadSummary();
+  });
 
   if (!summary && !error) return <DashboardSkeleton />;
 
@@ -63,6 +86,17 @@ export function DashboardView() {
   const upcomingEvents = summary.upcomingEvents ?? [];
   const recentActivities = summary.recentActivities ?? [];
   const groupStats = summary.groupStats ?? [];
+  const charts = summary.charts ?? {};
+  const attendanceTrend = charts.attendanceTrend ?? (summary.attendanceSeries ?? []).map((item: any) => ({ label: item.name, attendance: item.value }));
+  const financeTrend = charts.financeTrend ?? (summary.financeSeries ?? []).map((item: any) => ({ label: item.name, amount: item.giving }));
+  const incomeExpenses = charts.incomeExpenses ?? (summary.financeSeries ?? []).map((item: any) => ({ label: item.name, income: item.giving, expenses: item.expenses }));
+  const peopleDistribution = charts.peopleDistribution ?? (summary.givingByType ?? []);
+  const departmentMembers = charts.departmentMembers ?? [];
+  const eventsAttendance = charts.eventsAttendance ?? [];
+  const taskCompletion = charts.taskCompletion ?? [];
+  const peopleSparkline = (summary.peopleGrowthSeries ?? []).map((item: any) => ({ label: item.name, value: item.value }));
+  const attendanceSparkline = attendanceTrend.map((item: any) => ({ label: item.label, value: item.attendance }));
+  const givingSparkline = financeTrend.map((item: any) => ({ label: item.label, value: item.amount }));
 
   return (
     <div className="space-y-6">
@@ -71,11 +105,23 @@ export function DashboardView() {
         subtitle="Track attendance, finance, groups, events, and ministry activity across every branch in one premium command center."
       />
 
+      {error ? (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          {error}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total people" value={summary.peopleTotal ?? 0} icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Total people" value={summary.peopleTotal ?? 0} icon={<Users className="h-5 w-5" />}>
+          <MiniSparklineChart data={peopleSparkline} />
+        </StatCard>
         <StatCard label="New people this month" value={summary.newPeopleThisMonth ?? 0} icon={<UserPlus className="h-5 w-5" />} accent="green" />
-        <StatCard label="Total attendance today" value={summary.latestPeopleAttendance ?? summary.attendanceToday ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="info" />
-        <StatCard label="Net balance" value={formatCurrency(summary.netBalance ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="warning" />
+        <StatCard label="Total attendance today" value={summary.latestPeopleAttendance ?? summary.attendanceToday ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="info">
+          <MiniSparklineChart data={attendanceSparkline} color="rgb(var(--color-info))" />
+        </StatCard>
+        <StatCard label="Net balance" value={formatCurrency(summary.netBalance ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="warning">
+          <MiniSparklineChart data={givingSparkline} color="rgb(var(--color-warning))" />
+        </StatCard>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -96,11 +142,29 @@ export function DashboardView() {
         <StatCard label="Fund contributions this month" value={formatCurrency(summary.fundContributionsThisMonth ?? 0)} icon={<HandCoins className="h-5 w-5" />} accent="green" />
       </section>
 
-      <DashboardCharts
-        peopleGrowthSeries={summary.peopleGrowthSeries ?? []}
-        attendanceSeries={summary.attendanceSeries ?? []}
-        financeSeries={summary.financeSeries ?? []}
-      />
+      <section className="grid gap-5 lg:grid-cols-2">
+        <ChartCard title="Attendance trend" description="Attendance movement across recent months" className="lg:col-span-2">
+          <AttendanceTrendChart data={attendanceTrend} />
+        </ChartCard>
+        <ChartCard title="Income vs expenses" description="Monthly giving compared with spending">
+          <IncomeExpensesChart data={incomeExpenses} />
+        </ChartCard>
+        <ChartCard title="Finance trend" description="Contribution movement across recent months">
+          <FinanceTrendChart data={financeTrend} />
+        </ChartCard>
+        <ChartCard title="Department members" description="Member count by department">
+          <DepartmentMembersChart data={departmentMembers} />
+        </ChartCard>
+        <ChartCard title="Event attendance" description="Attendance recorded for events">
+          <EventsAttendanceChart data={eventsAttendance} />
+        </ChartCard>
+        <ChartCard title="People distribution" description="People grouped by classification">
+          <PeopleDistributionChart data={peopleDistribution} />
+        </ChartCard>
+        <ChartCard title="Event status" description="Published, completed, and cancelled events">
+          <TaskCompletionChart data={taskCompletion} />
+        </ChartCard>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5">

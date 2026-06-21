@@ -1,4 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { validateApiEnv } from './env';
+
+function setMinimumSearchParam(url: URL, key: string, minimum: number) {
+  const current = Number(url.searchParams.get(key));
+  if (!Number.isFinite(current) || current < minimum) {
+    url.searchParams.set(key, String(minimum));
+  }
+}
 
 function normalizeDatabaseUrl() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -10,21 +18,17 @@ function normalizeDatabaseUrl() {
 
     if (!isSupabasePooler) return;
 
-    if (url.port === '6543' && !url.searchParams.has('pgbouncer')) {
+    if (url.port === '6543') {
       url.searchParams.set('pgbouncer', 'true');
     }
 
-    if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '1');
-    }
+    setMinimumSearchParam(url, 'connection_limit', 5);
 
     if (!url.searchParams.has('connect_timeout')) {
       url.searchParams.set('connect_timeout', '30');
     }
 
-    if (!url.searchParams.has('pool_timeout')) {
-      url.searchParams.set('pool_timeout', '30');
-    }
+    setMinimumSearchParam(url, 'pool_timeout', 60);
 
     if (!url.searchParams.has('sslmode')) {
       url.searchParams.set('sslmode', 'require');
@@ -45,7 +49,7 @@ export async function withPrismaConnectionRetry<T>(operation: () => Promise<T>, 
     } catch (error) {
       lastError = error;
       const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
-      const isConnectionError = code === 'P1001' || code === 'P1002';
+      const isConnectionError = code === 'P1001' || code === 'P1002' || code === 'P2024';
 
       if (!isConnectionError || attempt === attempts) break;
 
@@ -57,6 +61,7 @@ export async function withPrismaConnectionRetry<T>(operation: () => Promise<T>, 
 }
 
 normalizeDatabaseUrl();
+validateApiEnv();
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

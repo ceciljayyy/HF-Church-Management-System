@@ -8,25 +8,24 @@ import { LAYOUT } from '@/lib/layout-constants';
 
 type ActivityItem = {
   id: string;
-  title?: string;
+  actorName?: string;
   description?: string | null;
-  type?: string;
   action?: string;
-  entity?: string;
+  module?: string;
+  entityType?: string;
+  entityName?: string;
   createdAt?: string;
-  user?: { name?: string | null } | null;
 };
 
 function formatMeta(item: ActivityItem) {
-  const actor = item.user?.name ?? 'System';
+  const actor = item.actorName ?? 'System';
   const date = item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Recent';
   return `${actor} - ${date}`;
 }
 
 function titleFor(item: ActivityItem) {
-  if (item.title) return item.title;
   const action = item.action ? item.action.replaceAll('_', ' ').toLowerCase() : 'activity';
-  return `${action} ${item.entity ?? ''}`.trim();
+  return `${action} ${item.entityName ?? item.entityType ?? ''}`.trim();
 }
 
 export function RightPanel() {
@@ -48,7 +47,7 @@ export function RightPanel() {
     }
 
     loadActivities();
-    const interval = window.setInterval(loadActivities, 15000);
+    const interval = window.setInterval(loadActivities, 30000);
     return () => {
       mounted = false;
       window.clearInterval(interval);
@@ -85,7 +84,7 @@ export function RightPanel() {
             {activities.slice(3, 6).map((item) => (
               <div key={item.id} className="rounded-lg border border-border bg-surface px-4 py-3">
                 <p className="text-sm capitalize text-primary">{titleFor(item)}</p>
-                <p className="mt-1 text-xs text-secondary">{item.entity ?? item.type ?? 'System'}</p>
+                <p className="mt-1 text-xs text-secondary">{item.module ?? item.entityType ?? 'System'}</p>
               </div>
             ))}
             {activities.length <= 3 ? <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary">More updates will appear here.</p> : null}

@@ -126,7 +126,7 @@ export function EventsPageClient({
     () =>
       (data.items ?? []).map((event: any) => [
         <Link key={`${event.id}-title`} href={`/events/${event.id}`} className="font-semibold text-primary hover:text-lime">{event.title}</Link>,
-        <Badge>{label(event.eventType)}</Badge>,
+        <Badge key={`${event.id}-type`}>{label(event.eventType)}</Badge>,
         formatDate(event.startDateTime),
         `${formatTime(event.startDateTime)} - ${formatTime(event.endDateTime)}`,
         label(event.locationType ?? 'PHYSICAL'),

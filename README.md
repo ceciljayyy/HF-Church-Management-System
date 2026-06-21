@@ -131,6 +131,24 @@ church-management-system/
 
 ---
 
+## Environment
+
+Use the Supabase transaction pooler for the API runtime connection, and use the direct database host for Prisma migrate/db push operations. Keep real passwords in local `.env` files only; do not commit them.
+
+```bash
+# Runtime database connection through Supabase pooler
+DATABASE_URL="postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=5&pool_timeout=60"
+
+# Direct database connection for Prisma migrate/db push
+DIRECT_URL="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres"
+
+AUTH_SECRET="replace_with_a_long_random_secret"
+NEXT_PUBLIC_WEB_URL="http://localhost:3000"
+API_URL="http://localhost:3001"
+```
+
+---
+
 ## Redis Caching
 
 Redis is an optional cache layer for repeated backend reads. PostgreSQL remains the permanent source of truth.

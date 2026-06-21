@@ -11,6 +11,8 @@ import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
 import { AttendancePageSkeleton } from '@/components/skeletons/page-skeletons';
+import { ChartCard } from '@/components/charts/chart-card';
+import { AttendanceTrendChart } from '@/components/charts/attendance-trend-chart';
 import { attendanceService } from '@/lib/services/attendance.service';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 
@@ -123,6 +125,7 @@ export function AttendancePage({ mode, sectionId }: { mode: Mode; sectionId?: st
 }
 
 function Overview({ overview, sections, onRecord }: { overview: any; sections: any[]; onRecord: (section: any) => void }) {
+  const attendanceTrend = (overview?.trend ?? []).map((item: any) => ({ label: item.name, attendance: Number(item.value ?? 0) }));
   const cards = [
     { href: '/attendance/main-service', label: 'Main Service Total Attendance', data: overview?.cards?.main, trend: 'Main Service' },
     { href: '/attendance/children-service', label: 'Children Service Total Attendance', data: overview?.cards?.children, trend: 'Children Service' },
@@ -152,7 +155,9 @@ function Overview({ overview, sections, onRecord }: { overview: any; sections: a
         <StatCard label="Latest Vehicles Count" value={overview?.vehiclesToday ?? 0} icon={<Car className="h-5 w-5" />} accent="warning" />
       </section>
       <section className="grid gap-5 xl:grid-cols-2">
-        <TrendCard title="Attendance Trend" data={overview?.trend ?? []} />
+        <ChartCard title="Attendance trend" description="Recent attendance movement">
+          <AttendanceTrendChart data={attendanceTrend} />
+        </ChartCard>
         <Panel title="Custom Attendance Sections">
           <div className="grid gap-3 sm:grid-cols-2">
             {sections.filter((section) => !section.isDefault).map((section) => (
@@ -183,6 +188,7 @@ function Overview({ overview, sections, onRecord }: { overview: any; sections: a
 function DetailView({ detail, onRecord }: { detail: any; onRecord: (section: any) => void }) {
   const section = detail.section;
   const latest = detail.latest;
+  const attendanceTrend = (detail.trend ?? []).map((item: any) => ({ label: item.name, attendance: Number(item.value ?? 0) }));
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -195,7 +201,9 @@ function DetailView({ detail, onRecord }: { detail: any; onRecord: (section: any
         <StatCard label="Highest" value={detail.highest ?? 0} icon={<Users className="h-5 w-5" />} accent="warning" />
         <StatCard label="Lowest" value={detail.lowest ?? 0} icon={<Users className="h-5 w-5" />} accent="danger" />
       </section>
-      <TrendCard title={`${section.name} Trend`} data={detail.trend ?? []} />
+      <ChartCard title={`${section.name} trend`} description="Recorded totals over time">
+        <AttendanceTrendChart data={attendanceTrend} />
+      </ChartCard>
       <HistoryTable records={detail.records ?? []} />
     </div>
   );
@@ -216,25 +224,6 @@ function SectionsView({ sections }: { sections: any[] }) {
           <p className="mt-4 text-xs text-muted">{section.fields.length} fields</p>
         </Link>
       ))}
-    </div>
-  );
-}
-
-function TrendCard({ title, data }: { title: string; data: any[] }) {
-  const max = Math.max(1, ...data.map((item) => Number(item.value ?? 0)));
-  return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <h3 className="text-sm font-semibold text-primary">{title}</h3>
-      <div className="mt-4 space-y-3">
-        {data.map((item) => (
-          <div key={item.name} className="grid grid-cols-[7rem_minmax(0,1fr)_4rem] items-center gap-3 text-sm">
-            <span className="truncate text-secondary">{item.name}</span>
-            <div className="h-2 rounded-full bg-surface"><div className="h-2 rounded-full bg-lime" style={{ width: `${(Number(item.value ?? 0) / max) * 100}%` }} /></div>
-            <span className="text-right text-xs text-muted">{number(item.value)}</span>
-          </div>
-        ))}
-        {!data.length ? <p className="text-sm text-secondary">No trend data yet.</p> : null}
-      </div>
     </div>
   );
 }

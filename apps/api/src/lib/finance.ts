@@ -1,6 +1,8 @@
 import { prisma } from './prisma';
 
 type BranchFilter = { branchId?: string };
+type FinanceChurchProfile = { welfareMonthlyPayment?: unknown | null };
+type FinanceOverviewOptions = { churchProfile?: FinanceChurchProfile | null };
 
 export function toNumber(value: unknown) {
   if (value === null || value === undefined) return 0;
@@ -30,7 +32,7 @@ function monthLabel(date: Date) {
   return date.toLocaleString('en-US', { month: 'short' });
 }
 
-export async function getFinanceOverview(branchId?: string | null) {
+export async function getFinanceOverview(branchId?: string | null, options: FinanceOverviewOptions = {}) {
   const branchFilter: BranchFilter = branchId ? { branchId } : {};
   const now = new Date();
   const startOfMonth = startOfCurrentMonth();
@@ -116,7 +118,11 @@ export async function getFinanceOverview(branchId?: string | null) {
       select: { expenseDate: true, amount: true, category: true },
     }),
     prisma.member.count({ where: { ...branchFilter, status: 'ACTIVE', deletedAt: null } }),
-    branchId ? (prisma as any).churchProfile.findUnique({ where: { branchId } }) : Promise.resolve(null),
+    options.churchProfile !== undefined
+      ? Promise.resolve(options.churchProfile)
+      : branchId
+        ? (prisma as any).churchProfile.findUnique({ where: { branchId }, select: { welfareMonthlyPayment: true } })
+        : Promise.resolve(null),
   ]);
 
   const totalGivingThisMonth = toNumber(contributionTotal._sum.amount);

@@ -46,6 +46,18 @@ export type AttendanceRecord = {
   updatedAt: string;
 };
 
+type AttendanceChurchProfile = {
+  enableChildrenServiceAttendance?: boolean | null;
+  enableVehicleCount?: boolean | null;
+};
+
+type BuildAttendanceOverviewOptions = {
+  churchProfile?: AttendanceChurchProfile | null;
+};
+
+const ATTENDANCE_SETTING_CACHE_TTL_MS = 30_000;
+const attendanceSettingCache = new Map<string, { expiresAt: number; value: Prisma.JsonValue | undefined }>();
+
 export const defaultAttendanceSections: AttendanceSection[] = [
   {
     id: 'main-service',
@@ -102,6 +114,31 @@ function key(branchId: string, name: string) {
   return { branchId_key: { branchId, key: name } };
 }
 
+function cacheKey(branchId: string, name: string) {
+  return `${branchId}:${name}`;
+}
+
+async function getAttendanceSetting(branchId: string, name: string) {
+  const cacheName = cacheKey(branchId, name);
+  const cached = attendanceSettingCache.get(cacheName);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const setting = await prisma.setting.findUnique({
+    where: key(branchId, name),
+    select: { value: true },
+  });
+  const value = setting?.value;
+  attendanceSettingCache.set(cacheName, {
+    value,
+    expiresAt: Date.now() + ATTENDANCE_SETTING_CACHE_TTL_MS,
+  });
+  return value;
+}
+
+function clearAttendanceSettingCache(branchId: string, name: string) {
+  attendanceSettingCache.delete(cacheKey(branchId, name));
+}
+
 function asArray<T>(value: Prisma.JsonValue | null | undefined, fallback: T[]) {
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
@@ -111,8 +148,8 @@ export function slugify(value: string) {
 }
 
 export async function getAttendanceSections(branchId: string) {
-  const setting = await prisma.setting.findUnique({ where: key(branchId, 'attendance.sections') });
-  const custom = asArray<AttendanceSection>(setting?.value, []);
+  const value = await getAttendanceSetting(branchId, 'attendance.sections');
+  const custom = asArray<AttendanceSection>(value, []);
   const byId = new Map([...defaultAttendanceSections, ...custom].map((section) => [section.id, section]));
   return Array.from(byId.values()).filter((section) => section.status !== 'ARCHIVED');
 }
@@ -123,12 +160,13 @@ export async function saveCustomAttendanceSections(branchId: string, sections: A
     update: { value: sections as unknown as Prisma.InputJsonValue },
     create: { branchId, key: 'attendance.sections', value: sections as unknown as Prisma.InputJsonValue, type: 'JSON' },
   });
+  clearAttendanceSettingCache(branchId, 'attendance.sections');
   await invalidateAttendanceCache(branchId);
 }
 
 export async function getAttendanceRecords(branchId: string) {
-  const setting = await prisma.setting.findUnique({ where: key(branchId, 'attendance.records') });
-  return asArray<AttendanceRecord>(setting?.value, []).sort((a, b) => new Date(b.attendanceDate).getTime() - new Date(a.attendanceDate).getTime());
+  const value = await getAttendanceSetting(branchId, 'attendance.records');
+  return asArray<AttendanceRecord>(value, []).sort((a, b) => new Date(b.attendanceDate).getTime() - new Date(a.attendanceDate).getTime());
 }
 
 export async function saveAttendanceRecords(branchId: string, records: AttendanceRecord[]) {
@@ -137,6 +175,7 @@ export async function saveAttendanceRecords(branchId: string, records: Attendanc
     update: { value: records as unknown as Prisma.InputJsonValue },
     create: { branchId, key: 'attendance.records', value: records as unknown as Prisma.InputJsonValue, type: 'JSON' },
   });
+  clearAttendanceSettingCache(branchId, 'attendance.records');
   await invalidateAttendanceCache(branchId);
 }
 
@@ -167,11 +206,16 @@ export function summarizeAttendance(section: AttendanceSection, records: Attenda
   };
 }
 
-export async function buildAttendanceOverview(branchId: string) {
+export async function buildAttendanceOverview(branchId: string, options: BuildAttendanceOverviewOptions = {}) {
   const [allSections, records, churchProfile] = await Promise.all([
     getAttendanceSections(branchId),
     getAttendanceRecords(branchId),
-    (prisma as any).churchProfile.findUnique({ where: { branchId } }),
+    options.churchProfile !== undefined
+      ? Promise.resolve(options.churchProfile)
+      : (prisma as any).churchProfile.findUnique({
+          where: { branchId },
+          select: { enableChildrenServiceAttendance: true, enableVehicleCount: true },
+        }),
   ]);
   const sections = allSections.filter((section) => {
     if (section.id === 'children-service' && churchProfile?.enableChildrenServiceAttendance === false) return false;
