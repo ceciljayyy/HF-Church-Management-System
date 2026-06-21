@@ -14,6 +14,11 @@ import { PeopleSelector } from '@/components/people/people-selector';
 import { StatCard } from '@/components/ui/stat-card';
 import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 import { ExpensesPageSkeleton, FinanceOverviewSkeleton, FundsPageSkeleton, WelfarePageSkeleton } from '@/components/skeletons/page-skeletons';
+import { ChartCard } from '@/components/charts/chart-card';
+import { FinanceTrendChart } from '@/components/charts/finance-trend-chart';
+import { IncomeExpensesChart } from '@/components/charts/income-expenses-chart';
+import { PeopleDistributionChart } from '@/components/charts/people-distribution-chart';
+import { DepartmentMembersChart } from '@/components/charts/department-members-chart';
 import { financeService, type ExpenseFilters } from '@/lib/services/finance.service';
 import { formatCurrency } from '@/lib/utils';
 
@@ -57,27 +62,6 @@ function StatusBadge({ status }: { status: string }) {
         ? 'border-info/40 bg-info/10 text-info'
         : 'border-green/40 bg-green/10 text-green';
   return <Badge className={className}>{label(status)}</Badge>;
-}
-
-function ChartCard({ title, data, valueKey = 'value' }: { title: string; data: any[]; valueKey?: string }) {
-  const max = Math.max(1, ...data.map((item) => Math.abs(Number(item[valueKey] ?? 0))));
-  return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <h3 className="text-sm font-semibold text-primary">{title}</h3>
-      <div className="mt-4 space-y-3">
-        {data.slice(0, 8).map((item) => (
-          <div key={item.name} className="grid grid-cols-[7rem_minmax(0,1fr)_5rem] items-center gap-3 text-sm">
-            <span className="truncate text-secondary">{item.name}</span>
-            <div className="h-2 rounded-full bg-surface">
-              <div className="h-2 rounded-full bg-lime" style={{ width: `${(Math.abs(Number(item[valueKey] ?? 0)) / max) * 100}%` }} />
-            </div>
-            <span className="text-right text-xs text-muted">{money(item[valueKey])}</span>
-          </div>
-        ))}
-        {!data.length ? <p className="text-sm text-secondary">No chart data yet.</p> : null}
-      </div>
-    </div>
-  );
 }
 
 export function FinancePage({ mode }: { mode: FinanceMode }) {
@@ -289,6 +273,11 @@ export function FinancePage({ mode }: { mode: FinanceMode }) {
 
 function Overview({ overview, welfare, funds, history }: { overview: any; welfare: any; funds: any[]; history: any[] }) {
   const activeFunds = funds.filter((fund) => (fund.status ?? 'ACTIVE') === 'ACTIVE');
+  const welfareTrend = (overview?.welfareMonthlyTrend ?? []).map((item: any) => ({ label: item.name, amount: Number(item.value ?? 0) }));
+  const expensesTrend = (overview?.expensesTrend ?? []).map((item: any) => ({ label: item.name, amount: Number(item.value ?? 0) }));
+  const incomeExpenses = (overview?.incomeVsExpenses ?? []).map((item: any) => ({ label: item.name, income: Number(item.giving ?? 0), expenses: Number(item.expenses ?? 0) }));
+  const fundContributions = (overview?.fundContributionsByFundType ?? []).map((item: any) => ({ department: item.name, members: Number(item.value ?? 0) }));
+  const paidVsUnpaid = overview?.welfarePaidVsUnpaid ?? [];
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -303,11 +292,21 @@ function Overview({ overview, welfare, funds, history }: { overview: any; welfar
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
-        <ChartCard title="Welfare Monthly Collection Trend" data={overview?.welfareMonthlyTrend ?? []} />
-        <ChartCard title="Expenses Trend" data={overview?.expensesTrend ?? []} />
-        <ChartCard title="Fund Contributions by Fund Type" data={overview?.fundContributionsByFundType ?? []} />
-        <ChartCard title="Income vs Expenses" data={(overview?.incomeVsExpenses ?? []).map((item: any) => ({ name: item.name, value: Number(item.giving ?? 0) - Number(item.expenses ?? 0) }))} />
-        <ChartCard title="Welfare Paid vs Unpaid Members" data={overview?.welfarePaidVsUnpaid ?? []} />
+        <ChartCard title="Welfare monthly collection trend">
+          <FinanceTrendChart data={welfareTrend} />
+        </ChartCard>
+        <ChartCard title="Expenses trend">
+          <FinanceTrendChart data={expensesTrend} />
+        </ChartCard>
+        <ChartCard title="Income vs expenses" className="xl:col-span-2">
+          <IncomeExpensesChart data={incomeExpenses} />
+        </ChartCard>
+        <ChartCard title="Fund contributions by fund type">
+          <DepartmentMembersChart data={fundContributions} />
+        </ChartCard>
+        <ChartCard title="Welfare paid vs unpaid members">
+          <PeopleDistributionChart data={paidVsUnpaid} />
+        </ChartCard>
       </section>
 
       <Panel title="Recent Finance Activity">

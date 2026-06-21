@@ -9,33 +9,38 @@ import { TableSkeleton } from '@/components/skeletons/table-skeleton';
 
 type AuditLog = {
   id: string;
+  actorName: string;
   action: string;
-  entity: string;
-  entityId?: string | null;
-  oldValue?: unknown;
-  newValue?: unknown;
-  ipAddress?: string | null;
-  userAgent?: string | null;
+  module: string;
+  entityType: string;
+  entityName: string;
+  description: string;
   createdAt: string;
-  user?: { id: string; name: string; email: string } | null;
+};
+
+type AuditLogDetail = AuditLog & {
+  beforeJson?: unknown;
+  afterJson?: unknown;
+  metadataJson?: {
+    entityId?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    actorEmail?: string | null;
+  } | null;
 };
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
 
-function moduleFor(log: AuditLog) {
-  const value = log.newValue as { module?: string } | null;
-  return value?.module ?? log.entity;
-}
-
 function cleanAction(action: string) {
-  return action.replaceAll('_', ' ').toLowerCase();
+  return action.replaceAll('_', ' ').replaceAll('.', ' ').toLowerCase();
 }
 
 export function AuditLogsPageClient() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState<AuditLog | null>(null);
+  const [selected, setSelected] = useState<AuditLogDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [filters, setFilters] = useState({ search: '', action: '', entity: '', from: '', to: '' });
 
   async function load(nextFilters = filters) {
@@ -52,9 +57,23 @@ export function AuditLogsPageClient() {
 
   useEffect(() => {
     load();
-    const interval = window.setInterval(() => load(), 15000);
+    const interval = window.setInterval(() => load(), 30000);
     return () => window.clearInterval(interval);
   }, []);
+
+  async function openDetail(log: AuditLog) {
+    setDetailLoading(true);
+    setSelected(log);
+    setError('');
+    try {
+      const detail = await apiClient.request<AuditLogDetail>(`/audit-logs/${log.id}`);
+      setSelected(detail);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load audit log detail.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,14 +158,13 @@ export function AuditLogsPageClient() {
                 <tr key={log.id} className="text-secondary transition hover:bg-hover">
                   <td className="whitespace-nowrap px-4 py-3">{new Date(log.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3">
-                    <p className="text-primary">{log.user?.name ?? 'System'}</p>
-                    <p className="text-xs text-muted">{log.user?.email ?? log.ipAddress ?? ''}</p>
+                    <p className="text-primary">{log.actorName ?? 'System'}</p>
                   </td>
-                  <td className="px-4 py-3 capitalize">{moduleFor(log)}</td>
+                  <td className="px-4 py-3 capitalize">{log.module}</td>
                   <td className="px-4 py-3 capitalize">{cleanAction(log.action)}</td>
-                  <td className="px-4 py-3">{log.entity}</td>
+                  <td className="px-4 py-3">{log.entityName}</td>
                   <td className="px-4 py-3">
-                    <button type="button" onClick={() => setSelected(log)} className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-hover">
+                    <button type="button" onClick={() => openDetail(log)} className="rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-hover">
                       View
                     </button>
                   </td>
@@ -168,19 +186,21 @@ export function AuditLogsPageClient() {
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold capitalize text-primary">{cleanAction(selected.action)}</h3>
-                <p className="mt-1 text-sm text-secondary">{selected.entity} {selected.entityId ? `- ${selected.entityId}` : ''}</p>
+                <p className="mt-1 text-sm text-secondary">{selected.entityType} {selected.metadataJson?.entityId ? `- ${selected.metadataJson.entityId}` : ''}</p>
               </div>
               <button type="button" aria-label="Close details" onClick={() => setSelected(null)} className="rounded-lg border border-border bg-surface p-2 text-secondary transition hover:bg-hover hover:text-primary">
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {detailLoading ? <p className="mb-4 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary">Loading audit details...</p> : null}
             <div className="grid gap-4 md:grid-cols-2">
-              <JsonBlock title="Old Value" value={selected.oldValue} />
-              <JsonBlock title="New Value" value={selected.newValue} />
+              <JsonBlock title="Old Value" value={selected.beforeJson} />
+              <JsonBlock title="New Value" value={selected.afterJson} />
             </div>
             <div className="mt-4 rounded-lg border border-border bg-surface p-4 text-sm text-secondary">
-              <p>User agent: {selected.userAgent ?? 'Unknown'}</p>
-              <p className="mt-1">IP address: {selected.ipAddress ?? 'Unknown'}</p>
+              <p>User agent: {selected.metadataJson?.userAgent ?? 'Unknown'}</p>
+              <p className="mt-1">IP address: {selected.metadataJson?.ipAddress ?? 'Unknown'}</p>
+              <p className="mt-1">Actor email: {selected.metadataJson?.actorEmail ?? 'Unknown'}</p>
             </div>
           </div>
         </div>

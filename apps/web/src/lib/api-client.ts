@@ -1,3 +1,5 @@
+import { requestDashboardRefresh } from './dashboard-refresh';
+
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = { success: false; message: string; details?: unknown };
 
@@ -16,6 +18,7 @@ async function parseResponse<T>(response: Response) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
   const response = await fetch(`/api/v1${path}`, {
     ...init,
     headers: {
@@ -30,6 +33,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok || !payload.success) {
     const message = 'message' in payload ? payload.message : 'Request failed';
     throw new Error(message);
+  }
+
+  if (method !== 'GET' && method !== 'HEAD') {
+    requestDashboardRefresh();
   }
 
   return payload.data;

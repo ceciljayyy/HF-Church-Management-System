@@ -10,6 +10,8 @@ import { FormField } from '@/components/ui/form-field';
 import { Modal } from '@/components/ui/modal';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/charts/chart-card';
+import { EventsAttendanceChart } from '@/components/charts/events-attendance-chart';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import { eventsService } from '@/lib/services/events.service';
 
@@ -53,6 +55,10 @@ export function EventDetailPageClient({
   const event = data.item;
   const stats = data.attendanceStats ?? {};
   const attendance = data.attendance ?? [];
+  const eventAttendanceChart = attendance.map((record: any) => ({
+    label: new Date(record.attendanceDate).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+    attendance: Number(record.total ?? 0),
+  }));
 
   async function refresh() {
     try {
@@ -139,6 +145,10 @@ export function EventDetailPageClient({
         <StatCard label="First Timers" value={stats.firstTimers ?? 0} icon={<Users className="h-5 w-5" />} accent="lime" />
         <StatCard label="Online" value={stats.onlineAttendees ?? 0} icon={<CalendarDays className="h-5 w-5" />} accent="danger" />
       </section>
+
+      <ChartCard title="Event attendance" description="Attendance recorded for this event over time">
+        <EventsAttendanceChart data={eventAttendanceChart} />
+      </ChartCard>
 
       <section className="rounded-lg border border-border bg-card p-5">
         <h3 className="text-sm font-semibold text-primary">Attendance Breakdown</h3>

@@ -6,12 +6,14 @@ export function StatCard({
   delta,
   icon,
   accent = 'lime',
+  children,
 }: {
   label: string;
   value: number | string;
   delta?: string;
   icon: React.ReactNode;
   accent?: 'lime' | 'green' | 'info' | 'warning' | 'danger';
+  children?: React.ReactNode;
 }) {
   const accentClasses: Record<string, string> = {
     lime: 'from-lime/20 to-lime/5 text-lime',
@@ -30,6 +32,7 @@ export function StatCard({
           <p className="truncate text-sm text-secondary">{label}</p>
           <h3 className="mt-2 break-words text-xl font-semibold leading-tight text-primary sm:text-2xl">{displayValue}</h3>
           {delta ? <p className="mt-2 min-w-0 break-words text-xs text-secondary">{delta}</p> : null}
+          {children ? <div className="mt-3">{children}</div> : null}
         </div>
         <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br', accentClasses[accent])}>{icon}</div>
       </div>
