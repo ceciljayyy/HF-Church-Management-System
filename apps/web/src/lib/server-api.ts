@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 type ApiSuccess<T> = { success: true; data: T };
@@ -27,6 +26,9 @@ async function parseResponse<T>(response: Response) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { cookies } = (await import('next/headers')) as unknown as {
+    cookies: () => Promise<{ toString(): string }>;
+  };
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 

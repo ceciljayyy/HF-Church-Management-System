@@ -9,9 +9,18 @@ import { cacheKeys } from '@/lib/cache-keys';
 
 type BranchFilter = { branchId?: string };
 type DashboardChurchProfile = {
-  welfareMonthlyPayment?: unknown | null;
   enableChildrenServiceAttendance?: boolean | null;
   enableVehicleCount?: boolean | null;
+};
+type DashboardAttendanceRecord = {
+  attendanceDate: string;
+  sectionSlug?: string;
+  total?: number;
+};
+type WeeklyAttendanceBucket = {
+  date: Date;
+  mainService: number;
+  childrenService: number;
 };
 
 const CHURCH_PROFILE_CACHE_TTL_MS = 30_000;
@@ -29,34 +38,33 @@ function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function monthLabel(date: Date) {
   return date.toLocaleString('en-US', { month: 'short' });
 }
 
-function groupMonthlyCounts<T>(months: Date[], rows: T[], getDate: (row: T) => Date) {
-  const counts = rows.reduce<Record<string, number>>((acc, row) => {
-    const key = monthKey(getDate(row));
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
-
-  return months.map((month) => ({
-    name: monthLabel(month),
-    value: counts[monthKey(month)] ?? 0,
-  }));
+function dayLabel(date: Date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function groupMonthlyAmounts<T>(months: Date[], rows: T[], getDate: (row: T) => Date, getAmount: (row: T) => unknown) {
-  const totals = rows.reduce<Record<string, number>>((acc, row) => {
-    const key = monthKey(getDate(row));
-    acc[key] = (acc[key] ?? 0) + toNumber(getAmount(row));
-    return acc;
-  }, {});
+function birthdayLabel(date: Date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+}
 
-  return months.map((month) => ({
-    name: monthLabel(month),
-    value: totals[monthKey(month)] ?? 0,
-  }));
+function isWelfareContribution(item: { type?: string | null; notes?: string | null }) {
+  return item.type === 'WELFARE' || item.notes?.includes('financeKind=WELFARE');
+}
+
+function cleanAction(action: string) {
+  return action.replaceAll('_', ' ').replaceAll('.', ' ').toLowerCase();
+}
+
+function describeAuditLog(log: { action: string; entity: string; entityId?: string | null }) {
+  const entityName = log.entityId ?? log.entity;
+  return `${cleanAction(log.action)} ${entityName}`.trim();
 }
 
 async function getDashboardChurchProfile(branchId?: string | null) {
@@ -68,7 +76,6 @@ async function getDashboardChurchProfile(branchId?: string | null) {
   const profile = await (prisma as any).churchProfile.findUnique({
     where: { branchId },
     select: {
-      welfareMonthlyPayment: true,
       enableChildrenServiceAttendance: true,
       enableVehicleCount: true,
     },
@@ -82,101 +89,118 @@ async function getDashboardChurchProfile(branchId?: string | null) {
   return profile as DashboardChurchProfile | null;
 }
 
+function buildWeeklyAttendanceTrend(attendanceOverview: any | null) {
+  const records = ((attendanceOverview?.records ?? []) as DashboardAttendanceRecord[])
+    .filter((record) => record.sectionSlug === 'main-service' || record.sectionSlug === 'children-service')
+    .slice()
+    .sort((a, b) => new Date(a.attendanceDate).getTime() - new Date(b.attendanceDate).getTime());
+
+  const byDate: Record<string, WeeklyAttendanceBucket> = records.reduce((acc: Record<string, WeeklyAttendanceBucket>, record) => {
+    const date = new Date(record.attendanceDate);
+    const key = dayKey(date);
+    acc[key] ??= { date, mainService: 0, childrenService: 0 };
+    if (record.sectionSlug === 'main-service') acc[key].mainService += Number(record.total ?? 0);
+    if (record.sectionSlug === 'children-service') acc[key].childrenService += Number(record.total ?? 0);
+    return acc;
+  }, {});
+
+  return Object.values(byDate)
+    .slice(-8)
+    .map((item) => ({
+      label: dayLabel(item.date),
+      mainService: item.mainService,
+      childrenService: item.childrenService,
+      total: item.mainService + item.childrenService,
+    }));
+}
+
 async function getDashboardCards(branchId?: string | null) {
   const filter = branchFilter(branchId);
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-
   const churchProfile = await getDashboardChurchProfile(branchId).catch(() => null);
 
   const [
-    peopleTotalResult,
+    totalPeopleResult,
     newPeopleThisMonthResult,
-    attendanceTodayResult,
     contributionTotalResult,
-    welfareTotalResult,
     expenseTotalResult,
-    pendingExpenseApprovalsResult,
-    activeFundCampaignsResult,
-    activeMembersResult,
-    upcomingEventsCountResult,
     attendanceOverviewResult,
   ] = await Promise.allSettled([
     prisma.person.count({ where: { ...filter, deletedAt: null } }),
     prisma.person.count({ where: { ...filter, deletedAt: null, createdAt: { gte: startOfMonth } } }),
-    prisma.attendanceRecord.count({
-      where: {
-        checkedInAt: { gte: startOfToday },
-        session: branchId ? { branchId } : undefined,
-      },
-    }),
     prisma.contribution.aggregate({
       _sum: { amount: true },
-      where: { ...filter, deletedAt: null, contributionDate: { gte: startOfMonth } },
-    }),
-    prisma.contribution.aggregate({
-      _sum: { amount: true },
-      where: {
-        ...filter,
-        deletedAt: null,
-        contributionDate: { gte: startOfMonth },
-        OR: [
-          { type: 'WELFARE' as const },
-          { type: 'OTHER' as const, notes: { contains: 'financeKind=WELFARE' } },
-        ],
-      },
+      where: { ...filter, deletedAt: null },
     }),
     prisma.expense.aggregate({
       _sum: { amount: true },
-      where: { ...filter, deletedAt: null, expenseDate: { gte: startOfMonth } },
-    }),
-    prisma.expense.count({ where: { ...filter, deletedAt: null, status: 'PENDING' } }),
-    prisma.financialFund.count({ where: { ...filter, status: 'ACTIVE' } }),
-    prisma.member.count({ where: { ...filter, status: 'ACTIVE', deletedAt: null } }),
-    prisma.event.count({
-      where: { ...filter, deletedAt: null, status: 'PUBLISHED', startDateTime: { gte: now } },
+      where: { ...filter, deletedAt: null },
     }),
     branchId ? buildAttendanceOverview(branchId, { churchProfile }) : Promise.resolve(null),
   ]);
 
-  const peopleTotal = resultValue<number>(peopleTotalResult, 0);
-  const newPeopleThisMonth = resultValue<number>(newPeopleThisMonthResult, 0);
-  const attendanceToday = resultValue<number>(attendanceTodayResult, 0);
-  const contributionTotal = resultValue<any>(contributionTotalResult, { _sum: { amount: 0 } });
-  const welfareTotal = resultValue<any>(welfareTotalResult, { _sum: { amount: 0 } });
-  const expenseTotal = resultValue<any>(expenseTotalResult, { _sum: { amount: 0 } });
-  const pendingExpenseApprovals = resultValue<number>(pendingExpenseApprovalsResult, 0);
-  const activeFundCampaigns = resultValue<number>(activeFundCampaignsResult, 0);
-  const activeMembers = resultValue<number>(activeMembersResult, 0);
-  const upcomingEventsCount = resultValue<number>(upcomingEventsCountResult, 0);
   const attendanceOverview = resultValue<any | null>(attendanceOverviewResult, null);
-
-  const totalGivingThisMonth = toNumber(contributionTotal._sum.amount);
-  const welfareCollectedThisMonth = toNumber(welfareTotal._sum.amount);
-  const expenses = toNumber(expenseTotal._sum.amount);
-  const welfareMonthlyPayment = toNumber(churchProfile?.welfareMonthlyPayment) || 5;
+  const totalIncome = toNumber(resultValue<any>(contributionTotalResult, { _sum: { amount: 0 } })._sum.amount);
+  const totalExpenses = toNumber(resultValue<any>(expenseTotalResult, { _sum: { amount: 0 } })._sum.amount);
 
   return {
-    peopleTotal,
-    activePeople: peopleTotal,
-    newPeopleThisMonth,
-    activeMembers,
-    attendanceToday,
-    latestPeopleAttendance: attendanceOverview?.peopleAttendanceToday ?? 0,
-    mainServiceAttendance: attendanceOverview?.cards.main.latestTotal ?? 0,
-    childrenServiceAttendance: attendanceOverview?.cards.children.latestTotal ?? 0,
-    vehiclesCount: attendanceOverview?.vehiclesToday ?? 0,
-    welfareCollectedThisMonth,
-    welfareArrears: Math.max(activeMembers * welfareMonthlyPayment - welfareCollectedThisMonth, 0),
-    fundContributionsThisMonth: totalGivingThisMonth - welfareCollectedThisMonth,
-    expenses,
-    netBalance: totalGivingThisMonth - expenses,
-    pendingExpenseApprovals,
-    activeFundCampaigns,
-    upcomingEventsCount,
+    totalPeople: resultValue<number>(totalPeopleResult, 0),
+    newPeopleThisMonth: resultValue<number>(newPeopleThisMonthResult, 0),
+    totalAttendance: Number(attendanceOverview?.peopleAttendanceToday ?? 0),
+    netBalance: totalIncome - totalExpenses,
   };
+}
+
+async function getBirthdaysThisMonth(branchId?: string | null, limit = 3) {
+  if (!branchId) return [];
+
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+  const people = await prisma.person.findMany({
+    where: {
+      branchId,
+      deletedAt: null,
+      dateOfBirth: { not: null },
+    },
+    select: {
+      id: true,
+      firstName: true,
+      middleName: true,
+      lastName: true,
+      preferredName: true,
+      dateOfBirth: true,
+      phone: true,
+      mobilePhone: true,
+      profilePhotoUrl: true,
+    },
+  });
+
+  return people
+    .filter((person) => person.dateOfBirth && person.dateOfBirth.getMonth() === currentMonth)
+    .sort((a, b) => {
+      const firstDay = a.dateOfBirth?.getDate() ?? 0;
+      const secondDay = b.dateOfBirth?.getDate() ?? 0;
+      return firstDay - secondDay;
+    })
+    .slice(0, limit)
+    .map((person) => {
+      const dateOfBirth = person.dateOfBirth as Date;
+      const fullName = [person.preferredName || person.firstName, person.middleName, person.lastName]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        id: person.id,
+        fullName,
+        dateOfBirth,
+        birthdayLabel: birthdayLabel(dateOfBirth),
+        phone: person.mobilePhone ?? person.phone ?? null,
+        avatarUrl: person.profilePhotoUrl ?? null,
+        isToday: dateOfBirth.getDate() === currentDay,
+      };
+    });
 }
 
 async function getDashboardSummary(branchId?: string | null) {
@@ -189,206 +213,84 @@ async function getDashboardSummary(branchId?: string | null) {
   const [cardsResult, detailsResult] = await Promise.allSettled([
     getDashboardCards(branchId),
     Promise.allSettled([
-      prisma.person.findMany({
-        where: { ...filter, deletedAt: null, createdAt: { gte: startWindow } },
-        select: { createdAt: true },
-      }),
-      prisma.attendanceRecord.findMany({
-        where: {
-          checkedInAt: { gte: startWindow },
-          session: branchId ? { branchId } : undefined,
-        },
-        select: { checkedInAt: true },
-      }),
-      prisma.event.findMany({
-        where: { ...filter, deletedAt: null, status: 'PUBLISHED', startDateTime: { gte: now } },
-        take: 5,
-        orderBy: { startDateTime: 'asc' },
-        select: { id: true, title: true, startDateTime: true, status: true },
-      }),
-      prisma.activityLog.findMany({
-        where: filter,
-        take: 8,
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, title: true, description: true, type: true, createdAt: true },
-      }),
-      prisma.group.groupBy({
-        by: ['type'],
-        where: { ...filter, deletedAt: null },
-        _count: { _all: true },
-      }),
-      prisma.group.findMany({
-        where: { ...filter, type: 'DEPARTMENT', deletedAt: null },
-        orderBy: { name: 'asc' },
-        take: 10,
-        select: {
-          name: true,
-          _count: { select: { members: true } },
-        },
-      }),
-      prisma.person.groupBy({
-        by: ['classification'],
-        where: { ...filter, deletedAt: null },
-        _count: { _all: true },
-      }),
-      prisma.event.groupBy({
-        by: ['status'],
-        where: { ...filter, deletedAt: null },
-        _count: { _all: true },
-      }),
-      prisma.group.count({ where: { ...filter, type: 'DEPARTMENT', deletedAt: null } }),
-      prisma.event.count({ where: { ...filter, deletedAt: null } }),
       prisma.contribution.findMany({
         where: { ...filter, deletedAt: null, contributionDate: { gte: startWindow } },
         select: { contributionDate: true, amount: true, type: true, notes: true },
       }),
       prisma.expense.findMany({
         where: { ...filter, deletedAt: null, expenseDate: { gte: startWindow } },
-        select: { expenseDate: true, amount: true, category: true },
+        select: { expenseDate: true, amount: true },
+      }),
+      prisma.auditLog.findMany({
+        where: filter,
+        take: 3,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          action: true,
+          entity: true,
+          entityId: true,
+          createdAt: true,
+          user: { select: { name: true } },
+        },
       }),
       branchId ? buildAttendanceOverview(branchId, { churchProfile }) : Promise.resolve(null),
+      getBirthdaysThisMonth(branchId, 3),
     ]),
   ]);
 
   const cards = resultValue<any>(cardsResult, {
-    peopleTotal: 0,
-    activePeople: 0,
+    totalPeople: 0,
     newPeopleThisMonth: 0,
-    activeMembers: 0,
-    attendanceToday: 0,
-    latestPeopleAttendance: 0,
-    mainServiceAttendance: 0,
-    childrenServiceAttendance: 0,
-    vehiclesCount: 0,
-    welfareCollectedThisMonth: 0,
-    welfareArrears: 0,
-    fundContributionsThisMonth: 0,
-    expenses: 0,
+    totalAttendance: 0,
     netBalance: 0,
-    pendingExpenseApprovals: 0,
-    activeFundCampaigns: 0,
-    upcomingEventsCount: 0,
+  });
+  const details = resultValue<PromiseSettledResult<unknown>[]>(detailsResult, []);
+  const contributionHistory = resultValue<any[]>(details[0], []);
+  const expenseHistory = resultValue<any[]>(details[1], []);
+  const recentActivities = resultValue<any[]>(details[2], []).map((item) => ({
+    id: item.id,
+    title: cleanAction(item.action),
+    description: describeAuditLog(item),
+    module: item.entity,
+    actorName: item.user?.name ?? 'System',
+    createdAt: item.createdAt,
+  }));
+  const attendanceOverview = resultValue<any | null>(details[3], null);
+  const birthdaysThisMonth = resultValue<any[]>(details[4], []);
+
+  const monthlyFinanceFlow = months.map((month) => {
+    const key = monthKey(month);
+    const contributions = contributionHistory.filter((item) => monthKey(item.contributionDate) === key);
+    const welfareCollected = contributions
+      .filter(isWelfareContribution)
+      .reduce((sum, item) => sum + toNumber(item.amount), 0);
+    const fundContributions = contributions
+      .filter((item) => !isWelfareContribution(item))
+      .reduce((sum, item) => sum + toNumber(item.amount), 0);
+    const expenses = expenseHistory
+      .filter((item) => monthKey(item.expenseDate) === key)
+      .reduce((sum, item) => sum + toNumber(item.amount), 0);
+
+    return {
+      label: monthLabel(month),
+      welfareCollected,
+      fundContributions,
+      expenses,
+      netBalance: welfareCollected + fundContributions - expenses,
+    };
   });
 
-  const details = resultValue<PromiseSettledResult<unknown>[]>(detailsResult, []);
-  const peopleHistory = resultValue<{ createdAt: Date }[]>(details[0], []);
-  const attendanceHistory = resultValue<{ checkedInAt: Date }[]>(details[1], []);
-  const upcomingEvents = resultValue<any[]>(details[2], []);
-  const recentActivities = resultValue<any[]>(details[3], []);
-  const groupStats = resultValue<any[]>(details[4], []);
-  const departmentMembersRaw = resultValue<any[]>(details[5], []);
-  const peopleDistributionRaw = resultValue<any[]>(details[6], []);
-  const eventStatusRaw = resultValue<any[]>(details[7], []);
-  const totalDepartments = resultValue<number>(details[8], 0);
-  const totalEvents = resultValue<number>(details[9], 0);
-  const contributionHistory = resultValue<any[]>(details[10], []);
-  const expenseHistory = resultValue<any[]>(details[11], []);
-  const attendanceOverview = resultValue<any | null>(details[12], null);
-
-  const peopleGrowthSeries = groupMonthlyCounts(months, peopleHistory, (item) => item.createdAt);
-  const attendanceSeries = groupMonthlyCounts(months, attendanceHistory, (item) => item.checkedInAt);
-  const contributionSeries = groupMonthlyAmounts(months, contributionHistory, (item) => item.contributionDate, (item) => item.amount);
-  const expenseSeries = groupMonthlyAmounts(months, expenseHistory, (item) => item.expenseDate, (item) => item.amount);
-  const financeSeries = months.map((month, index) => ({
-    name: monthLabel(month),
-    giving: contributionSeries[index]?.value ?? 0,
-    expenses: expenseSeries[index]?.value ?? 0,
-  }));
-
-  const givingByType = Object.values(
-    contributionHistory.reduce<Record<string, { name: string; value: number }>>((acc, item) => {
-      const key = item.type;
-      acc[key] ??= { name: key.replaceAll('_', ' '), value: 0 };
-      acc[key].value += toNumber(item.amount);
-      return acc;
-    }, {}),
-  );
-
-  const expensesByCategory = Object.values(
-    expenseHistory.reduce<Record<string, { name: string; value: number }>>((acc, item) => {
-      const key = item.category;
-      acc[key] ??= { name: key, value: 0 };
-      acc[key].value += toNumber(item.amount);
-      return acc;
-    }, {}),
-  );
-
-  const departmentMembers = departmentMembersRaw
-    .map((department) => ({
-      department: department.name,
-      members: department._count.members,
-    }))
-    .sort((a, b) => b.members - a.members);
-
-  const peopleDistribution = peopleDistributionRaw
-    .map((item) => ({
-      name: item.classification ?? 'Unassigned',
-      value: item._count._all,
-    }))
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
-
-  const taskCompletion = eventStatusRaw
-    .map((item) => ({
-      name: item.status.replaceAll('_', ' '),
-      value: item._count._all,
-    }))
-    .filter((item) => item.value > 0);
-
-  const eventsAttendance = (attendanceOverview?.records ?? [])
-    .filter((record: any) => record.eventId || record.sourceType === 'Event')
-    .slice(0, 8)
-    .reverse()
-    .map((record: any) => ({
-      label: new Date(record.attendanceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      attendance: Number(record.total ?? 0),
-    }));
-
-  const attendanceTrend = ((attendanceOverview?.trend?.length ? attendanceOverview.trend : attendanceSeries) ?? []).map((item: any) => ({
-    label: item.name,
-    attendance: Number(item.value ?? 0),
-  }));
-
-  const financeTrend = financeSeries.map((item) => ({
-    label: item.name,
-    amount: item.giving,
-  }));
-
-  const incomeExpenses = financeSeries.map((item) => ({
-    label: item.name,
-    income: item.giving,
-    expenses: item.expenses,
-  }));
-
   return {
-    ...cards,
-    totalFundContributions: cards.fundContributionsThisMonth,
-    fundsAvailable: Math.max(cards.netBalance, 0),
-    peopleGrowthSeries,
-    attendanceSeries,
-    financeSeries,
-    givingByType,
-    expensesByCategory,
-    upcomingEvents,
-    recentActivities,
-    groupStats,
-    stats: {
-      totalPeople: cards.peopleTotal,
-      totalDepartments,
-      totalEvents,
-      totalContributions: cards.welfareCollectedThisMonth + cards.fundContributionsThisMonth,
-      pendingTasks: eventStatusRaw.find((item) => item.status === 'PUBLISHED')?._count._all ?? 0,
-      completedTasks: eventStatusRaw.find((item) => item.status === 'COMPLETED')?._count._all ?? 0,
-    },
+    cards,
     charts: {
-      attendanceTrend,
-      departmentMembers,
-      peopleDistribution,
-      eventsAttendance,
-      financeTrend,
-      incomeExpenses,
-      taskCompletion,
+      weeklyAttendanceTrend: buildWeeklyAttendanceTrend(attendanceOverview),
+      monthlyFinanceFlow,
+    },
+    recentActivities,
+    rightPanel: {
+      birthdaysThisMonth,
+      recentActivities,
     },
   };
 }
@@ -407,7 +309,7 @@ export async function GET(req: NextRequest) {
         60,
         () => getDashboardCards(session.branchId) as any,
       );
-      return success(cards);
+      return success({ cards });
     }
 
     const summary = await getOrSetCache(

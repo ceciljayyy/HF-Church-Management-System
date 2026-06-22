@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
-import { RightPanel } from './right-panel';
 import { LAYOUT } from '@/lib/layout-constants';
 
 export function AppShell({
@@ -19,7 +18,6 @@ export function AppShell({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const pathname = usePathname();
-  const showRightPanel = pathname === '/dashboard';
   const sidebarWidth = desktopSidebarCollapsed ? LAYOUT.sidebarCollapsed : LAYOUT.sidebarExpanded;
 
   useEffect(() => {
@@ -77,9 +75,8 @@ export function AppShell({
       <div
         style={{
           ['--sidebar-offset' as string]: `${sidebarWidth}px`,
-          ['--right-panel-offset' as string]: showRightPanel ? `${LAYOUT.rightPanel}px` : '0px',
         }}
-        className="flex h-screen min-w-0 flex-col overflow-y-auto overflow-x-hidden transition-[padding] duration-200 lg:pl-[var(--sidebar-offset)] xl:pr-[var(--right-panel-offset)]"
+        className="flex h-screen min-w-0 flex-col overflow-y-auto overflow-x-hidden transition-[padding] duration-200 lg:pl-[var(--sidebar-offset)]"
       >
         <Topbar
           user={user}
@@ -89,7 +86,6 @@ export function AppShell({
         />
         <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
       </div>
-      {showRightPanel ? <RightPanel /> : null}
     </div>
   );
 }

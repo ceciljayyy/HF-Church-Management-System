@@ -256,15 +256,34 @@ export const expenseSchema = z.object({
 });
 
 export const dashboardSummarySchema = z.object({
-  peopleTotal: z.number().int(),
-  activePeople: z.number().int(),
-  newPeopleThisMonth: z.number().int(),
-  attendanceToday: z.number().int(),
-  totalGivingThisMonth: z.number(),
-  tithes: z.number(),
-  offerings: z.number(),
-  expenses: z.number(),
-  netBalance: z.number(),
+  cards: z.object({
+    totalPeople: z.number().int(),
+    newPeopleThisMonth: z.number().int(),
+    totalAttendance: z.number().int(),
+    netBalance: z.number(),
+  }),
+  charts: z.object({
+    weeklyAttendanceTrend: z.array(z.object({
+      label: z.string(),
+      mainService: z.number(),
+      childrenService: z.number(),
+      total: z.number(),
+    })),
+    monthlyFinanceFlow: z.array(z.object({
+      label: z.string(),
+      welfareCollected: z.number(),
+      fundContributions: z.number(),
+      expenses: z.number(),
+      netBalance: z.number(),
+    })),
+  }),
+  recentActivities: z.array(z.object({
+    id: idSchema,
+    title: z.string(),
+    description: z.string().nullable(),
+    type: z.string(),
+    createdAt: dateStringSchema,
+  })).optional(),
 });
 
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
