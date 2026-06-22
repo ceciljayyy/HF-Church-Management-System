@@ -7,19 +7,19 @@ class ChartErrorBoundary extends Component<
   { children: React.ReactNode },
   { hasError: boolean }
 > {
-  state = { hasError: false };
+  override state = { hasError: false };
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[chart] render failed', error, info.componentStack);
     }
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">Unable to render this chart.</div>;
     }
