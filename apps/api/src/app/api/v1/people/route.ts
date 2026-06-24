@@ -14,6 +14,10 @@ import {
   canReadPeople,
   createPersonWithMembership,
   getAuthedSession,
+  normalizeDate,
+  normalizeEmail,
+  normalizeFullName,
+  normalizePhone,
   requireBranchId,
 } from '@/lib/people';
 
@@ -27,9 +31,33 @@ const updatePersonSchema = z.object({
     ),
   mobilePhone: z.string().trim().optional().nullable(),
   phone: z.string().trim().optional().nullable(),
+  dateOfBirth: z.string().trim().optional().nullable(),
   classification: z.string().trim().optional().nullable(),
   notes: z.string().trim().optional().nullable(),
 });
+
+async function findPersonDuplicate(input: { firstName?: string; lastName?: string; gender?: string | null; email?: string | null; phone?: string | null; mobilePhone?: string | null; dateOfBirth?: string | null }, branchId: string, excludeId?: string) {
+  const people = await prisma.person.findMany({
+    where: { branchId, deletedAt: null, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true, firstName: true, lastName: true, gender: true, email: true, phone: true, mobilePhone: true, dateOfBirth: true },
+  });
+  const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.mobilePhone ?? input.phone);
+  const fullName = normalizeFullName(input.firstName, input.lastName);
+  const genderKey = fullName && input.gender ? `${fullName}:${input.gender.toLowerCase()}` : null;
+  const dobKey = fullName && input.dateOfBirth ? `${fullName}:${normalizeDate(input.dateOfBirth)}` : null;
+
+  return people.find((person) => {
+    const personName = normalizeFullName(person.firstName, person.lastName);
+    return (
+      (email && normalizeEmail(person.email) === email) ||
+      (phone && [person.phone, person.mobilePhone].some((value) => normalizePhone(value) === phone)) ||
+      (fullName && personName === fullName) ||
+      (genderKey && personName && person.gender && `${personName}:${String(person.gender).toLowerCase()}` === genderKey) ||
+      (dobKey && personName && `${personName}:${normalizeDate(person.dateOfBirth)}` === dobKey)
+    );
+  });
+}
 
 export async function GET(req: NextRequest) {
   const session = await getAuthedSession(req);
@@ -115,6 +143,8 @@ export async function POST(req: NextRequest) {
   try {
     const input = createPersonSchema.parse(await req.json());
     const branchId = await requireBranchId(session.branchId);
+    const duplicate = await findPersonDuplicate(input, branchId);
+    if (duplicate) return failure('Duplicate person detected. Review the existing person before saving.', 409, { personId: duplicate.id });
     const person = await createPersonWithMembership(input, branchId);
     await auditPersonCreate(req, branchId, session.userId, person);
     await invalidatePeopleCache(branchId);
@@ -140,10 +170,25 @@ export async function PATCH(req: NextRequest) {
     if (!existing) return failure('Person not found', 404);
 
     const input = updatePersonSchema.parse(await req.json());
+    const duplicate = await findPersonDuplicate(
+      {
+        firstName: input.firstName ?? existing.firstName,
+        lastName: input.lastName ?? existing.lastName,
+        gender: existing.gender,
+        email: input.email ?? existing.email,
+        phone: input.phone ?? existing.phone,
+        mobilePhone: input.mobilePhone ?? existing.mobilePhone,
+        dateOfBirth: input.dateOfBirth ?? (existing.dateOfBirth ? existing.dateOfBirth.toISOString().slice(0, 10) : null),
+      },
+      branchId,
+      id,
+    );
+    if (duplicate) return failure('Duplicate person detected. Review the existing person before saving.', 409, { personId: duplicate.id });
     const updated = await prisma.person.update({
       where: { id },
       data: {
         ...input,
+        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : input.dateOfBirth === null ? null : existing.dateOfBirth,
         phone: input.mobilePhone ?? input.phone ?? existing.phone,
       },
       include: {

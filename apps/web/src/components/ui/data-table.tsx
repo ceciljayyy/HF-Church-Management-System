@@ -5,7 +5,7 @@ export function DataTable({
   rows,
   minWidthClass = 'min-w-[640px]',
 }: {
-  columns: string[];
+  columns: React.ReactNode[];
   rows: Array<Array<React.ReactNode>>;
   minWidthClass?: string;
 }) {
@@ -28,7 +28,7 @@ export function DataTable({
           <thead className="bg-surface text-xs uppercase tracking-wide text-secondary">
             <tr>
               {columns.map((column, index) => (
-                <th key={column} className={cn('px-4 py-3 font-medium', index === columns.length - 1 && 'w-24 text-right')}>
+                <th key={index} className={cn('px-4 py-3 font-medium', index === columns.length - 1 && 'w-24 text-right')}>
                   {column}
                 </th>
               ))}

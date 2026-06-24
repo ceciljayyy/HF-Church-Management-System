@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   CalendarDays,
+  Cake,
   Church,
   ClipboardCheck,
   Cog,
@@ -50,6 +51,7 @@ const sections = [
     label: 'Care',
     items: [
       { href: '/first-timers', label: 'First Timers', icon: UserCheck },
+      { href: '/care/birthdays', label: 'Birthdays', icon: Cake },
       { href: '/prayer-requests', label: 'Prayer Requests', icon: HeartHandshake },
       { href: '/pastoral-care', label: 'Pastoral Care', icon: Church },
     ],

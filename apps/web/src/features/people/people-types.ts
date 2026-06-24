@@ -8,6 +8,7 @@ export type PersonRecord = {
   email?: string | null;
   phone?: string | null;
   mobilePhone?: string | null;
+  dateOfBirth?: string | null;
   classification?: string | null;
   createdAt: string;
   deletedAt?: string | null;
@@ -27,8 +28,33 @@ export type PeopleListResponse = {
 
 export type ImportResult = {
   totalRows: number;
-  imported: number;
+  imported?: number;
+  created?: number;
+  updated?: number;
   skipped: number;
-  duplicates: number;
+  duplicates?: number;
   errors: Array<{ row: number; message: string }>;
+};
+
+export type ImportPreviewRow = {
+  rowNumber: number;
+  rawData: unknown;
+  data: Record<string, unknown> | null;
+  status: 'ready' | 'duplicate' | 'error';
+  duplicateReason?: string;
+  matchingPersonId?: string;
+  matchingPersonName?: string;
+  matchingField?: string;
+  selectedAction: 'skip' | 'create' | 'update' | 'importAnyway';
+  errorMessage?: string;
+};
+
+export type ImportPreviewResult = {
+  totalRows: number;
+  validRows: number;
+  duplicateRows: number;
+  errorRows: number;
+  readyRows: number;
+  rows: ImportPreviewRow[];
+  warnings?: string[];
 };

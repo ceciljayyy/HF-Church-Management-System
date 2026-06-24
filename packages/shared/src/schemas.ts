@@ -141,6 +141,7 @@ export const importPeopleRowSchema = z
     classification: optionalText,
     occupation: optionalText,
     membershipDate: optionalDate,
+    department: optionalText,
     notes: optionalText,
   })
   .refine((row) => Boolean(row.fullName || (row.firstName && row.lastName)), {
