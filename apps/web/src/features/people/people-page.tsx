@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Archive, Download, Eye, FileUp, MoreVertical, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -63,6 +64,10 @@ export function PeoplePageClient({
   const [editingPerson, setEditingPerson] = useState<PersonRecord | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkMode, setBulkMode] = useState<'archive' | 'hardDelete' | null>(null);
+  const [bulkConfirmText, setBulkConfirmText] = useState('');
 
   const canCreate = hasPermission(permissions, 'people.create');
   const canImport = hasPermission(permissions, 'people.import') || canCreate;
@@ -71,6 +76,7 @@ export function PeoplePageClient({
 
   async function loadPeople(next?: { search?: string; status?: string; classification?: string; page?: number }) {
     setLoading(true);
+    setError('');
     const nextPage = next?.page ?? page;
     try {
       const response = await apiClient.listResource('people', {
@@ -82,7 +88,9 @@ export function PeoplePageClient({
       });
       setData(response);
       setPage(response.pagination?.page ?? nextPage);
+      setSelectedIds([]);
     } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load people.');
       showErrorToast(err, 'Unable to load people.');
     } finally {
       setLoading(false);
@@ -109,12 +117,44 @@ export function PeoplePageClient({
     if (!window.confirm(`Are you sure you want to ${label} ${displayName(person)}?`)) return;
 
     setLoading(true);
+    setError('');
     try {
       await apiClient.request(`/people?id=${person.id}&mode=${mode}`, { method: 'DELETE' });
+      await loadPeople();
       showSuccessToast(mode === 'archive' ? 'Person archived successfully.' : 'Person deleted successfully.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Unable to ${mode} person.`);
+      showErrorToast(err, `Unable to ${mode} person.`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = (data.items ?? []).map((person) => person.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds((current) => (allVisibleSelected ? current.filter((id) => !visibleIds.includes(id)) : Array.from(new Set([...current, ...visibleIds]))));
+  }
+
+  async function runBulkAction() {
+    if (!bulkMode || !selectedIds.length || bulkConfirmText !== 'DELETE') return;
+    setLoading(true);
+    try {
+      const response = await apiClient.request<{ count: number; mode: string }>('/people/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ personIds: selectedIds, mode: bulkMode }),
+      });
+      showSuccessToast(`${response.count} people ${bulkMode === 'archive' ? 'archived' : 'deleted'} successfully.`);
+      setBulkMode(null);
+      setBulkConfirmText('');
       await loadPeople();
     } catch (err) {
-      showErrorToast(err, `Unable to ${mode} person.`);
+      setError(err instanceof Error ? err.message : 'Unable to complete bulk action.');
+      showErrorToast(err, 'Unable to complete bulk action.');
     } finally {
       setLoading(false);
     }
@@ -122,6 +162,14 @@ export function PeoplePageClient({
 
   const rows =
     (data.items ?? []).map((person) => [
+        <input
+          key={`${person.id}-select`}
+          aria-label={`Select ${displayName(person)}`}
+          type="checkbox"
+          checked={selectedIds.includes(person.id)}
+          onChange={() => toggleSelected(person.id)}
+          className="h-4 w-4 rounded border-border bg-surface"
+        />,
         <button key={`${person.id}-name`} className="text-left font-medium text-primary hover:text-lime" onClick={() => setSelectedPerson(person)}>
           {displayName(person)}
         </button>,
@@ -191,6 +239,9 @@ export function PeoplePageClient({
         </div>,
       ]);
 
+  const visibleIds = (data.items ?? []).map((person) => person.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -198,6 +249,14 @@ export function PeoplePageClient({
         subtitle="Manage all people, visitors, contacts, and ministry records from one searchable church directory."
         actions={
           <>
+            {canImport ? (
+              <Link
+                href="/people/duplicates"
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold text-primary transition hover:bg-hover"
+              >
+                Review Duplicates
+              </Link>
+            ) : null}
             {canImport ? (
               <button
                 type="button"
@@ -261,13 +320,34 @@ export function PeoplePageClient({
         </FilterBar>
       </form>
 
+      {error ? <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div> : null}
+      {selectedIds.length ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-lime/30 bg-lime/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-semibold text-primary">{selectedIds.length} selected</span>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setBulkMode('archive')} className="rounded-lg border border-border bg-card px-3 py-2 text-primary transition hover:bg-hover">Archive</button>
+            <button type="button" onClick={() => setBulkMode('hardDelete')} className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger transition hover:bg-danger/20">Delete</button>
+            <button type="button" onClick={() => setSelectedIds([])} className="rounded-lg border border-border bg-card px-3 py-2 text-secondary transition hover:bg-hover hover:text-primary">Clear selection</button>
+          </div>
+        </div>
+      ) : null}
       {loading ? (
-        <TableSkeleton rows={7} columns={8} avatarColumn={true} showFilters={false} />
+        <TableSkeleton rows={7} columns={9} avatarColumn={true} showFilters={false} />
       ) : rows.length ? (
         <DataTable
-          columns={['Name', 'Email', 'Phone', 'Classification', 'Family', 'Status', 'Created At', 'Actions']}
+          columns={[
+            <input key="select-all" aria-label="Select all visible people" type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="h-4 w-4 rounded border-border bg-surface" />,
+            'Name',
+            'Email',
+            'Phone',
+            'Classification',
+            'Family',
+            'Status',
+            'Created At',
+            'Actions',
+          ]}
           rows={rows}
-          minWidthClass="min-w-[980px]"
+          minWidthClass="min-w-[1040px]"
         />
       ) : (
         <EmptyState title="No people yet" description="Add a person manually or import a Google Forms CSV export." />
@@ -305,6 +385,31 @@ export function PeoplePageClient({
         }}
       />
       <ImportPeopleDialog open={importOpen} onClose={() => setImportOpen(false)} onImported={() => loadPeople()} />
+      <Modal
+        open={Boolean(bulkMode)}
+        title={bulkMode === 'archive' ? 'Archive Selected People' : 'Delete Selected People'}
+        subtitle={`You are about to ${bulkMode === 'archive' ? 'archive' : 'delete'} ${selectedIds.length} people.`}
+        onClose={() => {
+          setBulkMode(null);
+          setBulkConfirmText('');
+        }}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-secondary">
+            You are about to delete {selectedIds.length} people. This action may affect welfare, departments, funds, attendance, and audit history.
+          </p>
+          <label className="space-y-2 text-sm text-secondary">
+            <span>Type DELETE to confirm</span>
+            <input className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none focus:border-lime" value={bulkConfirmText} onChange={(event) => setBulkConfirmText(event.target.value)} />
+          </label>
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <button type="button" onClick={() => setBulkMode(null)} className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary">Cancel</button>
+            <button type="button" disabled={bulkConfirmText !== 'DELETE' || loading} onClick={runBulkAction} className="rounded-lg bg-danger px-4 py-3 text-sm font-semibold text-white transition hover:bg-danger/90 disabled:opacity-60">
+              Confirm
+            </button>
+          </div>
+        </div>
+      </Modal>
       {editingPerson ? (
         <EditPersonDialog
           key={editingPerson.id}
@@ -345,6 +450,7 @@ function EditPersonDialog({
   const [lastName, setLastName] = useState(person.lastName);
   const [email, setEmail] = useState(person.email ?? '');
   const [mobilePhone, setMobilePhone] = useState(person.mobilePhone ?? person.phone ?? '');
+  const [dateOfBirth, setDateOfBirth] = useState(person.dateOfBirth?.slice(0, 10) ?? '');
   const [classification, setClassification] = useState(person.classification ?? 'Unassigned');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -366,6 +472,7 @@ function EditPersonDialog({
           lastName,
           email,
           mobilePhone,
+          dateOfBirth: dateOfBirth || null,
           classification,
         }),
       });
@@ -405,6 +512,10 @@ function EditPersonDialog({
           <label className="space-y-2 text-sm text-secondary">
             <span>Mobile Phone</span>
             <input className={inputClass} value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} />
+          </label>
+          <label className="space-y-2 text-sm text-secondary">
+            <span>Date of Birth</span>
+            <input className={inputClass} type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
           </label>
           <label className="space-y-2 text-sm text-secondary md:col-span-2">
             <span>Classification</span>

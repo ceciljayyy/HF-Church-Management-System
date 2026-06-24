@@ -8,6 +8,7 @@ import { ChartCard } from '@/components/charts/chart-card';
 import { MonthlyFinanceFlowChart } from '@/components/charts/monthly-finance-flow-chart';
 import { WeeklyAttendanceTrendChart } from '@/components/charts/weekly-attendance-trend-chart';
 import { PageHeader } from '@/components/ui/page-header';
+import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/ui/stat-card';
 import { apiClient } from '@/lib/api-client';
 import { useDashboardRefreshListener } from '@/lib/dashboard-refresh';
@@ -51,6 +52,8 @@ type RecentActivity = {
 
 export function DashboardView() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [birthdaysThisMonth, setBirthdaysThisMonth] = useState<BirthdayItem[]>([]);
+  const [birthdaysLoading, setBirthdaysLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async (shouldUpdate: () => boolean = () => true) => {
@@ -91,6 +94,28 @@ export function DashboardView() {
     };
   }, [loadSummary]);
 
+  useEffect(() => {
+    let mounted = true;
+    async function loadBirthdays() {
+      setBirthdaysLoading(true);
+      try {
+        const payload = await apiClient.request<{ data: BirthdayItem[] }>('/people/birthdays?scope=thisMonth&limit=3');
+        if (mounted) setBirthdaysThisMonth(payload.data ?? []);
+      } catch (err) {
+        if (mounted) {
+          setBirthdaysThisMonth([]);
+          showErrorToast(err, 'Unable to load birthday celebrants.');
+        }
+      } finally {
+        if (mounted) setBirthdaysLoading(false);
+      }
+    }
+    loadBirthdays();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useDashboardRefreshListener(() => {
     void loadSummary();
   });
@@ -114,7 +139,6 @@ export function DashboardView() {
   const cards = summary.cards ?? {};
   const charts = summary.charts ?? {};
   const rightPanel = summary.rightPanel ?? {};
-  const birthdaysThisMonth = rightPanel.birthdaysThisMonth ?? [];
   const recentActivities = rightPanel.recentActivities ?? summary.recentActivities ?? [];
 
   return (
@@ -148,7 +172,7 @@ export function DashboardView() {
         </div>
 
         <aside className="hidden max-h-[calc(100vh-9rem)] overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-glow xl:block">
-          <BirthdaysThisMonth birthdays={birthdaysThisMonth} />
+          <BirthdaysThisMonth birthdays={birthdaysThisMonth} loading={birthdaysLoading} />
           <div className="mt-6 border-t border-border pt-5">
             <RecentActivities activities={recentActivities.slice(0, 3)} />
           </div>
@@ -179,12 +203,25 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function BirthdaysThisMonth({ birthdays }: { birthdays: BirthdayItem[] }) {
+function BirthdaysThisMonth({ birthdays, loading }: { birthdays: BirthdayItem[]; loading: boolean }) {
   return (
     <section>
-      <SectionHeader title="Birthdays This Month" href="/people?birthdayMonth=current" />
+      <SectionHeader title="Birthdays This Month" href="/care/birthdays" />
       <div className="space-y-3">
-        {birthdays.length ? (
+        {loading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="rounded-xl border border-border bg-surface px-4 py-3">
+              <div className="flex gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : birthdays.length ? (
           birthdays.slice(0, 3).map((person) => (
             <div key={person.id} className="rounded-xl border border-border bg-surface px-4 py-3 transition hover:border-lime/40">
               <div className="flex gap-3">

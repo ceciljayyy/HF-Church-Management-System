@@ -76,7 +76,7 @@ export function normalizeGender(value?: string | null) {
 
 export function nullableDate(value?: string | null) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = parseFlexibleDate(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -96,6 +96,49 @@ export function splitFullName(fullName?: string | null) {
     middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
     lastName,
   };
+}
+
+export function normalizePhone(phone?: string | null) {
+  const raw = (phone ?? '').trim();
+  if (!raw) return null;
+  let value = raw.replace(/[\s\-()+]/g, '');
+  if (value.startsWith('233') && value.length === 12) value = `0${value.slice(3)}`;
+  if (value.length === 9 && !value.startsWith('0')) value = `0${value}`;
+  return value || null;
+}
+
+export function normalizeEmail(email?: string | null) {
+  const value = (email ?? '').trim().toLowerCase();
+  return value || null;
+}
+
+export function normalizeName(name?: string | null) {
+  const value = (name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return value ? value.replace(/\s/g, '') : null;
+}
+
+export function normalizeFullName(firstName?: string | null, lastName?: string | null) {
+  return normalizeName([firstName, lastName].filter(Boolean).join(' '));
+}
+
+export function normalizeDate(value?: string | Date | null) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : parseFlexibleDate(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+export function parseFlexibleDate(value?: string | null) {
+  const raw = (value ?? '').trim();
+  if (!raw) return new Date(Number.NaN);
+
+  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+
+  const us = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) return new Date(Date.UTC(Number(us[3]), Number(us[1]) - 1, Number(us[2])));
+
+  return new Date(raw);
 }
 
 export function normalizeImportRow(row: ImportPeopleRowInput): CreatePersonInput {

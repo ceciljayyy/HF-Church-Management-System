@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "prisma:push": "prisma db push --schema prisma/schema.prisma",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "seed:people": "tsx prisma/seed-people-from-csv.ts"
   },
   "dependencies": {
     "@church/shared": "workspace:*",
