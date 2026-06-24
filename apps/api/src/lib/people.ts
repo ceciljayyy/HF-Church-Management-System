@@ -202,69 +202,72 @@ async function nextMembershipNumber(tx: any, branchId: string) {
 }
 
 export async function createPersonWithMembership(input: CreatePersonInput, branchId: string) {
-  return prisma.$transaction(async (tx) => {
-    const created = await tx.person.create({
-      data: personData(input, branchId),
-      include: {
-        member: true,
-        familyMembers: { include: { family: true }, take: 1 },
-      },
-    });
-
-    if (input.familyId) {
-      await tx.familyMember.create({
-        data: {
-          familyId: input.familyId,
-          personId: created.id,
-          relationship: input.familyRole || 'Unassigned',
-          isHeadOfFamily: input.familyRole === 'Head of Family',
+  return prisma.$transaction(
+    async (tx) => {
+      const created = await tx.person.create({
+        data: personData(input, branchId),
+        include: {
+          member: true,
+          familyMembers: { include: { family: true }, take: 1 },
         },
       });
-    }
 
-    if (qualifiesForMembership(input.classification)) {
-      await tx.member.create({
-        data: {
-          branchId,
-          personId: created.id,
-          membershipNumber: await nextMembershipNumber(tx, branchId),
-          status: 'ACTIVE',
-          joinedAt: nullableDate(input.membershipDate),
-          membershipType: 'OTHER',
-        },
-      });
-    }
-
-    if (input.departmentId) {
-      const department = await tx.group.findFirst({
-        where: { id: input.departmentId, branchId, type: 'DEPARTMENT', deletedAt: null },
-      });
-      if (department) {
-        const role = input.departmentRoleType === 'HEAD' ? 'HEAD' : 'MEMBER';
-        const position = nullableText(input.departmentPosition) ?? (role === 'HEAD' ? department.meetingDay ?? 'Head of Department' : 'Member');
-        await tx.groupMember.upsert({
-          where: { groupId_personId: { groupId: department.id, personId: created.id } },
-          update: { role, status: position },
-          create: { groupId: department.id, personId: created.id, role, status: position },
+      if (input.familyId) {
+        await tx.familyMember.create({
+          data: {
+            familyId: input.familyId,
+            personId: created.id,
+            relationship: input.familyRole || 'Unassigned',
+            isHeadOfFamily: input.familyRole === 'Head of Family',
+          },
         });
-        if (role === 'HEAD') {
-          await tx.groupMember.updateMany({
-            where: { groupId: department.id, role: 'HEAD', personId: { not: created.id } },
-            data: { role: 'MEMBER' },
+      }
+
+      if (qualifiesForMembership(input.classification)) {
+        await tx.member.create({
+          data: {
+            branchId,
+            personId: created.id,
+            membershipNumber: await nextMembershipNumber(tx, branchId),
+            status: 'ACTIVE',
+            joinedAt: nullableDate(input.membershipDate),
+            membershipType: 'OTHER',
+          },
+        });
+      }
+
+      if (input.departmentId) {
+        const department = await tx.group.findFirst({
+          where: { id: input.departmentId, branchId, type: 'DEPARTMENT', deletedAt: null },
+        });
+        if (department) {
+          const role = input.departmentRoleType === 'HEAD' ? 'HEAD' : 'MEMBER';
+          const position = nullableText(input.departmentPosition) ?? (role === 'HEAD' ? department.meetingDay ?? 'Head of Department' : 'Member');
+          await tx.groupMember.upsert({
+            where: { groupId_personId: { groupId: department.id, personId: created.id } },
+            update: { role, status: position },
+            create: { groupId: department.id, personId: created.id, role, status: position },
           });
-          await tx.group.update({ where: { id: department.id }, data: { leaderId: created.id } });
+          if (role === 'HEAD') {
+            await tx.groupMember.updateMany({
+              where: { groupId: department.id, role: 'HEAD', personId: { not: created.id } },
+              data: { role: 'MEMBER' },
+            });
+            await tx.group.update({ where: { id: department.id }, data: { leaderId: created.id } });
+          }
         }
       }
-    }
 
-    return tx.person.findUnique({
-      where: { id: created.id },
-      include: {
-        member: true,
-        familyMembers: { include: { family: true }, take: 1 },
-      },
-    });
-  });
+      return tx.person.findUnique({
+        where: { id: created.id },
+        include: {
+          member: true,
+          familyMembers: { include: { family: true }, take: 1 },
+        },
+      });
+    },
+    { maxWait: 15_000, timeout: 30_000 },
+  );
 }
 
 export async function auditPersonCreate(req: NextRequest, branchId: string, userId: string, person: any) {

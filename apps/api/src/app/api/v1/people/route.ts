@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { createPersonSchema, peopleQuerySchema } from '@church/shared';
 import { prisma } from '@/lib/prisma';
@@ -146,11 +147,21 @@ export async function POST(req: NextRequest) {
     const duplicate = await findPersonDuplicate(input, branchId);
     if (duplicate) return failure('Duplicate person detected. Review the existing person before saving.', 409, { personId: duplicate.id });
     const person = await createPersonWithMembership(input, branchId);
-    await auditPersonCreate(req, branchId, session.userId, person);
-    await invalidatePeopleCache(branchId);
+    const sideEffects = await Promise.allSettled([
+      auditPersonCreate(req, branchId, session.userId, person),
+      invalidatePeopleCache(branchId),
+    ]);
+    sideEffects.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.warn(index === 0 ? 'People create audit log failed' : 'People create cache invalidation failed', result.reason);
+      }
+    });
     return success({ item: person }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) return failure('Validation error', 422, error.flatten());
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return failure('A person with the same unique field already exists.', 409, error.meta);
+    }
     return failure('Unable to create person', 500, error);
   }
 }
