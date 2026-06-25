@@ -9,7 +9,7 @@ const permissionAliases: Record<string, string[]> = {
   'events.manage': ['events.create', 'events.update', 'events.cancel', 'events.delete'],
   'attendance.manage': ['attendance.view', 'attendance.record', 'attendance.update'],
   'groups.manage': ['departments.view', 'departments.update', 'departments.addMember'],
-  'settings.update': ['settings.updateProfile', 'settings.updateChurchProfile'],
+  'settings.update': ['settings.view', 'settings.updateProfile', 'settings.updateChurchProfile'],
   'users.manage': ['users.view', 'users.create', 'users.update', 'users.deactivate'],
   'roles.manage': ['roles.view', 'roles.create', 'roles.update', 'roles.delete', 'roles.assign'],
   'audit.read': ['auditLogs.view'],
@@ -23,11 +23,18 @@ function equivalentPermissions(required: string) {
   return [required, ...aliases, ...reverseAliases];
 }
 
-export function hasPermission(permissions: string[], required: string) {
+export function can(permissions: string[] = [], required?: string) {
+  if (!required) return true;
   if (permissions.includes('admin.*')) return true;
   return equivalentPermissions(required).some((permission) => permissions.includes(permission));
 }
 
-export function hasAnyPermission(permissions: string[], required: string[]) {
-  return required.some((permission) => hasPermission(permissions, permission));
+export function canAny(permissions: string[] = [], required: string[] = []) {
+  if (!required.length) return true;
+  return required.some((permission) => can(permissions, permission));
 }
+
+export function canAll(permissions: string[] = [], required: string[] = []) {
+  return required.every((permission) => can(permissions, permission));
+}
+

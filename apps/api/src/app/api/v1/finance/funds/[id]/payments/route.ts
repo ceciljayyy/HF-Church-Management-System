@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 const fundPaymentSchema = z.object({
   contributorId: z.string().optional().nullable(),
@@ -23,15 +24,14 @@ function normalizeEnum(value: string | undefined, fallback: string) {
 }
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'funds.recordPayment')) return failure('Forbidden', 403);
     const { id } = await context.params;
     const fund = await prisma.financialFund.findFirst({ where: { id, branchId: session.branchId } });
     if (!fund) return failure('Fund not found', 404);

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { toNumber } from '@/lib/finance';
+import { hasPermission } from '@/lib/rbac';
 
 function monthStart(year: number, month: number) {
   return new Date(year, month - 1, 1);
@@ -25,9 +26,9 @@ function statusFor(balance: number, paid: number, hasInitial: boolean) {
 
 export async function GET(req: NextRequest) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'welfare.view')) return failure('Forbidden', 403);
     const url = new URL(req.url);
     const now = new Date();
     const month = Number(url.searchParams.get('month') ?? now.getMonth() + 1);

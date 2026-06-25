@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { toNumber } from '@/lib/finance';
 import { buildAttendanceOverview } from '@/lib/attendance';
 import { getCacheVersion, getOrSetCache } from '@/lib/cache';
 import { cacheKeys } from '@/lib/cache-keys';
+import { hasPermission } from '@/lib/rbac';
 
 type BranchFilter = { branchId?: string };
 type DashboardChurchProfile = {
@@ -297,10 +298,9 @@ async function getDashboardSummary(branchId?: string | null) {
 
 export async function GET(req: NextRequest) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'dashboard.view')) return failure('Forbidden', 403);
     const dashboardVersion = await getCacheVersion(cacheKeys.dashboardVersion(session.branchId));
 
     if (req.nextUrl.searchParams.get('scope') === 'cards') {

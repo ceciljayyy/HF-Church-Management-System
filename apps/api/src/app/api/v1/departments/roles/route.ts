@@ -2,10 +2,12 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.view')) return failure('Forbidden', 403);
 
   const url = new URL(req.url);
   const page = Number(url.searchParams.get('page') ?? 1);

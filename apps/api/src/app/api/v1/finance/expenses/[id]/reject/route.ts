@@ -2,15 +2,16 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { logFinanceActivity } from '@/lib/finance';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'expenses.reject')) return failure('Forbidden', 403);
     const { id } = await params;
     const expense = await prisma.expense.findFirst({ where: { id, branchId: session.branchId, deletedAt: null } });
     if (!expense) return failure('Expense not found', 404);

@@ -5,10 +5,12 @@ import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 import { failure, success } from '@/lib/http';
 import { canManageChurchProfile, churchProfileSchema, toChurchProfileData } from '@/lib/church-profile';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'settings.view')) return failure('Forbidden', 403);
 
   const churchProfile = await (prisma as any).churchProfile.findUnique({
     where: { branchId: session.branchId },

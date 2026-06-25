@@ -21,6 +21,7 @@
       "@church/shared/*": ["packages/shared/src/*"],
       "@/components/*": ["apps/web/src/components/*"],
       "@/features/*": ["apps/web/src/features/*"],
+      "@/hooks/*": ["apps/web/src/hooks/*"],
       "@/lib/*": ["apps/web/src/lib/*"],
       "@/types/*": ["apps/web/src/types/*"]
     }

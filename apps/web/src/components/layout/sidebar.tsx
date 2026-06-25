@@ -22,6 +22,7 @@ import {
   Users,
 } from 'lucide-react';
 import { LAYOUT } from '@/lib/layout-constants';
+import { canAny } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { SidebarToggle } from './sidebar-toggle';
 
@@ -30,42 +31,42 @@ const sections = [
     label: 'Main',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/people', label: 'People', icon: Users },
-      { href: '/departments', label: 'Departments', icon: Users },
-      { href: '/events', label: 'Events', icon: CalendarDays },
-      { href: '/attendance', label: 'Attendance', icon: ClipboardCheck },
+      { href: '/people', label: 'People', icon: Users, permissions: ['people.view'] },
+      { href: '/departments', label: 'Departments', icon: Users, permissions: ['departments.view'] },
+      { href: '/events', label: 'Events', icon: CalendarDays, permissions: ['events.view'] },
+      { href: '/attendance', label: 'Attendance', icon: ClipboardCheck, permissions: ['attendance.view'] },
       { href: '/kiosk', label: 'Kiosk Mode', icon: MonitorCheck },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/finance', label: 'Overview', icon: HandCoins },
-      { href: '/finance/welfare', label: 'Welfare', icon: HandCoins },
-      { href: '/finance/expenses', label: 'Expenses', icon: HandCoins },
-      { href: '/finance/funds', label: 'Funds', icon: HandCoins },
-      { href: '/finance/history', label: 'History', icon: ScrollText },
+      { href: '/finance', label: 'Overview', icon: HandCoins, permissions: ['finance.view'] },
+      { href: '/finance/welfare', label: 'Welfare', icon: HandCoins, permissions: ['welfare.view'] },
+      { href: '/finance/expenses', label: 'Expenses', icon: HandCoins, permissions: ['expenses.view', 'expenses.createForDepartment'] },
+      { href: '/finance/funds', label: 'Funds', icon: HandCoins, permissions: ['funds.view'] },
+      { href: '/finance/history', label: 'History', icon: ScrollText, permissions: ['finance.history.view', 'finance.view'] },
     ],
   },
   {
     label: 'Care',
     items: [
-      { href: '/first-timers', label: 'First Timers', icon: UserCheck },
-      { href: '/care/birthdays', label: 'Birthdays', icon: Cake },
-      { href: '/prayer-requests', label: 'Prayer Requests', icon: HeartHandshake },
-      { href: '/pastoral-care', label: 'Pastoral Care', icon: Church },
+      { href: '/first-timers', label: 'First Timers', icon: UserCheck, permissions: ['people.view'] },
+      { href: '/care/birthdays', label: 'Birthdays', icon: Cake, permissions: ['people.viewBirthdays', 'people.view'] },
+      { href: '/prayer-requests', label: 'Prayer Requests', icon: HeartHandshake, permissions: ['people.view'] },
+      { href: '/pastoral-care', label: 'Pastoral Care', icon: Church, permissions: ['people.view'] },
     ],
   },
   {
     label: 'System',
     items: [
-      { href: '/reports', label: 'Reports', icon: FileBarChart2 },
-      { href: '/communications', label: 'Communications', icon: MessageSquare },
+      { href: '/reports', label: 'Reports', icon: FileBarChart2, permissions: ['reports.read'] },
+      { href: '/communications', label: 'Communications', icon: MessageSquare, permissions: ['communications.view'] },
       { href: '/media', label: 'Media', icon: Image },
-      { href: '/settings', label: 'Settings', icon: Cog },
-      { href: '/admin/users', label: 'Users', icon: UserCog },
-      { href: '/admin/roles', label: 'Roles', icon: Shield },
-      { href: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
+      { href: '/settings', label: 'Settings', icon: Cog, permissions: ['settings.view'] },
+      { href: '/admin/users', label: 'Users', icon: UserCog, permissions: ['users.view'] },
+      { href: '/admin/roles', label: 'Roles', icon: Shield, permissions: ['roles.view'] },
+      { href: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText, permissions: ['auditLogs.view'] },
     ],
   },
 ];
@@ -74,6 +75,7 @@ export function Sidebar({
   mobileOpen,
   collapsed,
   churchProfile,
+  permissions,
   onToggleDesktop,
   onCloseMobile,
   onNavigate,
@@ -81,6 +83,7 @@ export function Sidebar({
   mobileOpen: boolean;
   collapsed: boolean;
   churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
+  permissions?: string[];
   onToggleDesktop: () => void;
   onCloseMobile: () => void;
   onNavigate: () => void;
@@ -124,13 +127,16 @@ export function Sidebar({
         </div>
       </div>
       <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pr-1">
-        {sections.map((section) => (
+        {sections.map((section) => {
+          const items = section.items.filter((item) => canAny(permissions ?? [], item.permissions ?? []));
+          if (!items.length) return null;
+          return (
           <div key={section.label}>
             <p className={cn('mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted', !showLabels && 'lg:hidden')}>
               {section.label}
             </p>
             <div className="space-y-1">
-              {section.items.map(({ href, label, icon: Icon }) => {
+              {items.map(({ href, label, icon: Icon }) => {
                 const active =
                   pathname === href ||
                   (href !== '/finance' && pathname.startsWith(`${href}/`));
@@ -154,7 +160,8 @@ export function Sidebar({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
     </aside>
   );

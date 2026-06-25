@@ -14,7 +14,9 @@ const smsSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getAuthedSession(req);
   if (!session) return failure('Unauthorized', 401);
-  if (!hasPermission(session.permissions, 'people.update')) return failure('Forbidden', 403);
+  if (!hasPermission(session.permissions, 'people.sendBirthdaySms') && !hasPermission(session.permissions, 'communications.sendBirthdaySms')) {
+    return failure('Forbidden', 403);
+  }
 
   try {
     const { personIds, message } = smsSchema.parse(await req.json());

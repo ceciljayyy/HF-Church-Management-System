@@ -2,20 +2,14 @@ import type { NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
 import type { CreatePersonInput, ImportPeopleRowInput } from '@church/shared';
 import { prisma } from './prisma';
-import { getTokenFromRequest, verifySessionToken } from './session';
+import { getRequestSession } from './request-session';
 import { hasAnyPermission, hasPermission } from './rbac';
 import { writeAuditLog, writeActivityLog } from './audit';
 
 const membershipClassifications = new Set(['Member', 'Leader', 'Pastor', 'Staff']);
 
 export async function getAuthedSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  try {
-    return await verifySessionToken(token);
-  } catch {
-    return null;
-  }
+  return getRequestSession(req);
 }
 
 export async function requireBranchId(sessionBranchId?: string | null) {
@@ -28,7 +22,7 @@ export async function requireBranchId(sessionBranchId?: string | null) {
 }
 
 export function canReadPeople(permissions: string[]) {
-  return hasPermission(permissions, 'people.read');
+  return hasPermission(permissions, 'people.view');
 }
 
 export function canCreatePeople(permissions: string[]) {

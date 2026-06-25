@@ -6,6 +6,7 @@ import { auditMetaFromRequest, createAuditLog, writeActivityLog } from '@/lib/au
 import { failure, success } from '@/lib/http';
 import { getAttendanceRecords } from '@/lib/attendance';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 import { invalidateDashboardCache } from '@/lib/cache-invalidation';
 
 const eventTypes = ['SERVICE', 'MEETING', 'CONFERENCE', 'OUTREACH', 'YOUTH', 'OTHER'] as const;
@@ -114,6 +115,7 @@ function attendanceStats(records: any[]) {
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'events.view')) return failure('Forbidden', 403);
   const { id } = await context.params;
   const [event, metadata, attendance] = await Promise.all([
     prisma.event.findFirst({
@@ -132,6 +134,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   try {
     const session = await getRequestSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'events.update')) return failure('Forbidden', 403);
     const { id } = await context.params;
     const existing = await prisma.event.findFirst({ where: { id, branchId: session.branchId, deletedAt: null } });
     if (!existing) return failure('Event not found', 404);
@@ -197,6 +200,9 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'events.cancel') && !hasPermission(session.permissions, 'events.delete')) {
+    return failure('Forbidden', 403);
+  }
   const { id } = await context.params;
   const existing = await prisma.event.findFirst({ where: { id, branchId: session.branchId, deletedAt: null } });
   if (!existing) return failure('Event not found', 404);

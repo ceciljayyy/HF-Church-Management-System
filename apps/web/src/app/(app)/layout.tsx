@@ -14,7 +14,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <AppShell
-      user={{ name: user.name, email: user.email, branchName: user.branch?.name }}
+      user={{
+        name: user.name,
+        email: user.email,
+        branchName: user.branch?.name,
+        permissions: user.permissions ?? [],
+        roles: user.roles ?? [],
+      }}
       churchProfile={status.churchProfile}
     >
       {children}

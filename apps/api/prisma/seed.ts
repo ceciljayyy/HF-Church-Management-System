@@ -1,61 +1,16 @@
 import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { defaultRolePermissions, permissionCatalog } from '@church/shared';
 import { prisma } from '../src/lib/prisma';
 
 const password = 'Password123!';
-
-const permissions = [
-  { key: 'dashboard.read', description: 'Read dashboard', module: 'dashboard' },
-  { key: 'people.read', description: 'Read people', module: 'people' },
-  { key: 'people.create', description: 'Create people', module: 'people' },
-  { key: 'people.import', description: 'Import people', module: 'people' },
-  { key: 'people.update', description: 'Update people', module: 'people' },
-  { key: 'people.archive', description: 'Archive people', module: 'people' },
-  { key: 'members.read', description: 'Read members', module: 'members' },
-  { key: 'members.create', description: 'Create members', module: 'members' },
-  { key: 'members.update', description: 'Update members', module: 'members' },
-  { key: 'members.archive', description: 'Archive members', module: 'members' },
-  { key: 'families.manage', description: 'Manage families', module: 'families' },
-  { key: 'groups.manage', description: 'Manage groups', module: 'groups' },
-  { key: 'events.manage', description: 'Manage events', module: 'events' },
-  { key: 'attendance.manage', description: 'Manage attendance', module: 'attendance' },
-  { key: 'finance.read', description: 'Read finance', module: 'finance' },
-  { key: 'finance.create', description: 'Create finance records', module: 'finance' },
-  { key: 'finance.update', description: 'Update finance records', module: 'finance' },
-  { key: 'finance.approve', description: 'Approve finance records', module: 'finance' },
-  { key: 'reports.read', description: 'Read reports', module: 'reports' },
-  { key: 'settings.update', description: 'Update settings', module: 'settings' },
-  { key: 'churchProfile.view', description: 'View church profile', module: 'settings' },
-  { key: 'churchProfile.update', description: 'Update church profile', module: 'settings' },
-  { key: 'onboarding.complete', description: 'Complete onboarding', module: 'onboarding' },
-  { key: 'users.manage', description: 'Manage users', module: 'admin' },
-  { key: 'roles.manage', description: 'Manage roles', module: 'admin' },
-  { key: 'audit.read', description: 'Read audit logs', module: 'audit' },
-] as const;
-
-const rolePermissions: Record<string, string[]> = {
-  'Super Admin': permissions.map((permission) => permission.key),
-  'Church Admin': permissions.map((permission) => permission.key).filter((key) => key !== 'roles.manage'),
-  Pastor: [
-    'dashboard.read',
-    'people.read',
-    'people.create',
-    'people.import',
-    'people.update',
-    'members.read',
-    'members.create',
-    'members.update',
-    'families.manage',
-    'groups.manage',
-    'events.manage',
-    'attendance.manage',
-    'reports.read',
-  ],
-  'Finance Officer': ['dashboard.read', 'finance.read', 'finance.create', 'finance.update', 'finance.approve', 'reports.read', 'audit.read'],
-  'Attendance Officer': ['dashboard.read', 'people.read', 'members.read', 'events.manage', 'attendance.manage', 'reports.read'],
-  'Group Leader': ['dashboard.read', 'people.read', 'members.read', 'groups.manage', 'attendance.manage'],
-  Member: ['dashboard.read'],
-};
+const permissions = permissionCatalog.map((permission) => ({
+  key: permission.key,
+  name: permission.name,
+  description: permission.name,
+  module: permission.module,
+}));
+const rolePermissions: Record<string, string[]> = defaultRolePermissions;
 
 async function upsertUser(branchId: string, name: string, email: string, roleId: string, passwordHash: string) {
   const user = await prisma.user.upsert({
@@ -146,9 +101,8 @@ async function main() {
   }
 
   const superAdmin = await upsertUser(branch.id, 'Super Admin', 'admin@church.test', roleByName.get('Super Admin')!, passwordHash);
-  const churchAdmin = await upsertUser(branch.id, 'Church Admin', 'admin.office@church.test', roleByName.get('Church Admin')!, passwordHash);
+  const churchAdmin = await upsertUser(branch.id, 'Church Administrator', 'admin.office@church.test', roleByName.get('Church Administrator')!, passwordHash);
   const financeOfficer = await upsertUser(branch.id, 'Finance Officer', 'finance@church.test', roleByName.get('Finance Officer')!, passwordHash);
-  const attendanceOfficer = await upsertUser(branch.id, 'Attendance Officer', 'attendance@church.test', roleByName.get('Attendance Officer')!, passwordHash);
 
   const people = await Promise.all(
     [
@@ -463,14 +417,14 @@ async function main() {
 
   const session = await prisma.attendanceSession.upsert({
     where: { branchId_title_sessionDate: { branchId: branch.id, title: 'Sunday Worship Check-In', sessionDate: serviceDate } },
-    update: { eventId: event.id, createdById: attendanceOfficer.id },
+    update: { eventId: event.id, createdById: churchAdmin.id },
     create: {
       branchId: branch.id,
       eventId: event.id,
       title: 'Sunday Worship Check-In',
       sessionDate: serviceDate,
       checkInMode: 'MANUAL',
-      createdById: attendanceOfficer.id,
+      createdById: churchAdmin.id,
     },
   });
 
@@ -480,7 +434,7 @@ async function main() {
       personId: person.id,
       status: 'PRESENT' as const,
       checkedInAt: serviceDate,
-      checkedInById: attendanceOfficer.id,
+      checkedInById: churchAdmin.id,
     })),
     skipDuplicates: true,
   });

@@ -2,8 +2,9 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { AttendanceRecord, calculateAttendanceTotal, getAttendanceRecords, getAttendanceSections, saveAttendanceRecords } from '@/lib/attendance';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { prisma } from '@/lib/prisma';
+import { hasPermission } from '@/lib/rbac';
 
 const recordSchema = z.object({
   sectionId: z.string().min(1),
@@ -15,14 +16,13 @@ const recordSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'attendance.view')) return failure('Forbidden', 403);
   const url = new URL(req.url);
   const sourceType = url.searchParams.get('sourceType');
   const eventId = url.searchParams.get('eventId');
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'attendance.record')) return failure('Forbidden', 403);
     const body = recordSchema.parse(await req.json());
     const sections = await getAttendanceSections(session.branchId);
     const section = sections.find((item) => item.id === body.sectionId || item.slug === body.sectionId);

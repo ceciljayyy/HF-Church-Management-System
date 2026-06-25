@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { failure, success } from '@/lib/http';
-import { geocodeSchema } from '@/lib/church-profile';
+import { canManageChurchProfile, geocodeSchema } from '@/lib/church-profile';
 import { getRequestSession } from '@/lib/request-session';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getRequestSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!canManageChurchProfile(session)) return failure('You do not have permission to perform this action.', 403);
 
     const body = geocodeSchema.parse(await req.json());
     const address = [body.streetAddress, body.city, body.stateOrRegion, body.postalCode, body.country]

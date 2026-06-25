@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 import { invalidateDepartmentCache } from '@/lib/cache-invalidation';
 
 async function parseJson(req: NextRequest) {
@@ -47,6 +48,7 @@ async function appendTransferHistory(branchId: string, transfer: Record<string, 
 export async function POST(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.addMember')) return failure('Forbidden', 403);
   const body = await parseJson(req);
   const groupId = clean(body.departmentId, '');
   const personId = clean(body.personId, '');
@@ -74,6 +76,9 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.transferMember') && !hasPermission(session.permissions, 'departments.update')) {
+    return failure('Forbidden', 403);
+  }
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return failure('Missing membership id');
 
@@ -126,6 +131,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.removeMember')) return failure('Forbidden', 403);
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return failure('Missing membership id');
 

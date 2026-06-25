@@ -5,13 +5,14 @@ import { usePathname } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 import { LAYOUT } from '@/lib/layout-constants';
+import { PermissionProvider } from '@/hooks/use-permissions';
 
 export function AppShell({
   user,
   churchProfile,
   children,
 }: {
-  user: { name: string; email: string; branchName?: string };
+  user: { name: string; email: string; branchName?: string; permissions?: string[]; roles?: string[] };
   churchProfile?: { churchName?: string; branchName?: string | null; logoUrl?: string | null } | null;
   children: ReactNode;
 }) {
@@ -55,11 +56,13 @@ export function AppShell({
   }
 
   return (
+    <PermissionProvider permissions={user.permissions ?? []}>
     <div className="h-screen overflow-hidden bg-background text-primary">
       <Sidebar
         mobileOpen={mobileSidebarOpen}
         collapsed={desktopSidebarCollapsed}
         churchProfile={churchProfile}
+        permissions={user.permissions ?? []}
         onToggleDesktop={toggleDesktopSidebar}
         onCloseMobile={() => setMobileSidebarOpen(false)}
         onNavigate={() => setMobileSidebarOpen(false)}
@@ -87,5 +90,6 @@ export function AppShell({
         <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-4 md:px-5 lg:px-6">{children}</main>
       </div>
     </div>
+    </PermissionProvider>
   );
 }

@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 const fundTypeSchema = z.object({
   name: z.string().min(1),
@@ -66,14 +67,13 @@ function slugify(value: string) {
 }
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'funds.view')) return failure('Forbidden', 403);
   return success({ items: fundTypes });
 }
 
@@ -81,6 +81,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'funds.create') && !hasPermission(session.permissions, 'funds.update')) {
+      return failure('Forbidden', 403);
+    }
     const body = fundTypeSchema.parse(await req.json());
     const item = {
       id: `${slugify(body.name)}-${Date.now().toString(36)}`,

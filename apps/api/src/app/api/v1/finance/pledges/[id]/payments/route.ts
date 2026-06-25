@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { logFinanceActivity, makeNumber, normalizeDate, toNumber } from '@/lib/finance';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 const paymentSchema = z.object({
   amount: z.coerce.number().positive(),
@@ -21,9 +22,9 @@ function normalizeEnum(value: string | undefined, fallback: string) {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'funds.recordPayment')) return failure('Forbidden', 403);
     const { id } = await params;
     const body = paymentSchema.parse(await req.json());
 

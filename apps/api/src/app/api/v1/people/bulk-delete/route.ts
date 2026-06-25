@@ -15,13 +15,13 @@ const bulkDeleteSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getAuthedSession(req);
   if (!session) return failure('Unauthorized', 401);
-  if (!hasPermission(session.permissions, 'people.archive')) return failure('Forbidden', 403);
+  if (!hasPermission(session.permissions, 'people.bulkDelete')) return failure('Forbidden', 403);
 
   try {
     const { personIds, mode } = bulkDeleteSchema.parse(await req.json());
     const branchId = await requireBranchId(session.branchId);
 
-    if (mode === 'hardDelete' && !hasPermission(session.permissions, 'admin.*')) {
+    if (mode === 'hardDelete' && !hasPermission(session.permissions, 'people.delete')) {
       return failure('Only Super Admin can hard delete people', 403);
     }
 

@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 const updateSchema = z.object({
   title: z.string().optional(),
@@ -13,14 +14,13 @@ const updateSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'funds.view')) return failure('Forbidden', 403);
   const { id } = await context.params;
   const item = await prisma.financialFund.findFirst({
     where: { id, branchId: session.branchId },
@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'funds.update')) return failure('Forbidden', 403);
     const { id } = await context.params;
     const body = updateSchema.parse(await req.json());
     const existing = await prisma.financialFund.findFirst({ where: { id, branchId: session.branchId } });

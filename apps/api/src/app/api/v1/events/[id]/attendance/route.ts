@@ -5,6 +5,7 @@ import { auditMetaFromRequest, createAuditLog, writeActivityLog } from '@/lib/au
 import { AttendanceRecord, getAttendanceRecords, saveAttendanceRecords } from '@/lib/attendance';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 const attendanceSchema = z.object({
   men: z.coerce.number().nonnegative().default(0),
@@ -43,6 +44,7 @@ function stats(records: AttendanceRecord[]) {
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'events.view')) return failure('Forbidden', 403);
   const { id } = await context.params;
   const event = await prisma.event.findFirst({ where: { id, branchId: session.branchId, deletedAt: null } });
   if (!event) return failure('Event not found', 404);
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   try {
     const session = await getRequestSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'events.recordAttendance')) return failure('Forbidden', 403);
     const { id } = await context.params;
     const event = await prisma.event.findFirst({ where: { id, branchId: session.branchId, deletedAt: null } });
     if (!event) return failure('Event not found', 404);

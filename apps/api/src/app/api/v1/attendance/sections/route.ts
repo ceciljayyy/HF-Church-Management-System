@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { AttendanceSection, getAttendanceSections, saveCustomAttendanceSections, slugify } from '@/lib/attendance';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 const fieldSchema = z.object({
   id: z.string().optional(),
@@ -25,14 +26,13 @@ const sectionSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'attendance.view')) return failure('Forbidden', 403);
   return success({ items: await getAttendanceSections(session.branchId) });
 }
 
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'attendance.createSection')) return failure('Forbidden', 403);
     const body = sectionSchema.parse(await req.json());
     const sections = await getAttendanceSections(session.branchId);
     const now = new Date().toISOString();

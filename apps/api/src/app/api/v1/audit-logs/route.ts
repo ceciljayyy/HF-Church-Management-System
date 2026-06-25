@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 function parsePositiveInteger(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -22,6 +23,7 @@ function describeAuditLog(log: { action: string; entity: string; entityId?: stri
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'auditLogs.view')) return failure('Forbidden', 403);
 
   const url = new URL(req.url);
   const page = parsePositiveInteger(url.searchParams.get('page'), 1);

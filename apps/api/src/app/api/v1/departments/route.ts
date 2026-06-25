@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 import { getCacheVersion, getOrSetCache } from '@/lib/cache';
 import { cacheKeys } from '@/lib/cache-keys';
 import { invalidateDepartmentCache } from '@/lib/cache-invalidation';
@@ -21,6 +22,7 @@ function clean(value: unknown) {
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.view')) return failure('Forbidden', 403);
 
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
@@ -85,6 +87,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.create')) return failure('Forbidden', 403);
   const body = await parseJson(req);
   const name = clean(body.name);
   if (!name) return failure('Department name is required');
@@ -107,6 +110,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'departments.update')) return failure('Forbidden', 403);
   const id = new URL(req.url).searchParams.get('id');
   if (!id) return failure('Missing department id');
 

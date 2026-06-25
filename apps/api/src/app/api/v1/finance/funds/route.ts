@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { logFinanceActivity, toNumber } from '@/lib/finance';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
+import { hasPermission } from '@/lib/rbac';
 
 const fundSchema = z.object({
   name: z.string().min(1),
@@ -19,9 +20,7 @@ const fundSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 function normalizeStatus(value: string | undefined) {
@@ -50,6 +49,7 @@ function summarizeFund(fund: any) {
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'funds.view')) return failure('Forbidden', 403);
   const funds = await prisma.financialFund.findMany({
     where: { branchId: session.branchId },
     include: {
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'funds.create')) return failure('Forbidden', 403);
     const body = fundSchema.parse(await req.json());
     const targetAmount = body.targetAmount ?? body.openingBalance;
     const item = await prisma.financialFund.create({

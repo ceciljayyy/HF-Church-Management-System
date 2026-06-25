@@ -1,7 +1,11 @@
 import { serverApi } from '@/lib/server-api';
-import { DepartmentRolesPageClient } from '@/features/departments/department-roles-page';
+import { AdminRolesPageClient } from '@/features/admin/roles-page';
 
 export default async function AdminRolesPage() {
-  const data = await serverApi.listResource('departments/roles', { page: 1, limit: 20 });
-  return <DepartmentRolesPageClient initialData={data} />;
+  const [roles, permissions] = await Promise.all([
+    serverApi.listResource('roles'),
+    serverApi.listResource('permissions'),
+  ]);
+
+  return <AdminRolesPageClient initialRoles={roles.items ?? []} permissions={permissions.items ?? []} />;
 }

@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 const welfarePaymentSchema = z.object({
   memberId: z.string().min(1),
@@ -26,14 +27,13 @@ function normalizeEnum(value: string | undefined, fallback: string) {
 }
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'welfare.view')) return failure('Forbidden', 403);
   const items = await prisma.contribution.findMany({
     where: { branchId: session.branchId, type: 'OTHER', notes: { contains: 'financeKind=WELFARE' }, deletedAt: null },
     include: { person: true, receivedBy: true },
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'welfare.recordPayment')) return failure('Forbidden', 403);
     const body = welfarePaymentSchema.parse(await req.json());
     const person = await prisma.person.findFirst({ where: { id: body.memberId, branchId: session.branchId, deletedAt: null } });
     if (!person) return failure('Member is required.', 422);

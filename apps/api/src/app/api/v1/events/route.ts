@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { auditMetaFromRequest, createAuditLog, writeActivityLog } from '@/lib/audit';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 import { invalidateDashboardCache } from '@/lib/cache-invalidation';
 
 const eventTypes = ['SERVICE', 'MEETING', 'CONFERENCE', 'OUTREACH', 'YOUTH', 'OTHER'] as const;
@@ -113,6 +114,7 @@ function mergeEvent(event: any, metadata: Record<string, any>) {
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'events.view')) return failure('Forbidden', 403);
 
   const url = new URL(req.url);
   const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
@@ -170,6 +172,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getRequestSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'events.create')) return failure('Forbidden', 403);
     const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } });
     const body = eventSchema.parse(await req.json());
     const startDateTime = combineDateTime(body.eventDate, body.startTime);

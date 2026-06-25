@@ -3,13 +3,14 @@ import { buildAttendanceOverview } from '@/lib/attendance';
 import { getCacheVersion, getOrSetCache } from '@/lib/cache';
 import { cacheKeys } from '@/lib/cache-keys';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'attendance.view')) return failure('Forbidden', 403);
     const version = await getCacheVersion(cacheKeys.attendanceVersion(session.branchId));
     const overview = await getOrSetCache(
       cacheKeys.attendanceOverview(session.branchId, version),

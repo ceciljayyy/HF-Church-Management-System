@@ -98,6 +98,7 @@ export function canManageChurchProfile(session: { roles?: string[]; permissions?
     permissions.includes('admin.*') ||
     permissions.includes('churchProfile.update') ||
     permissions.includes('onboarding.complete') ||
+    permissions.includes('settings.updateChurchProfile') ||
     roles.some((role) => role.toLowerCase().includes('admin'))
   );
 }

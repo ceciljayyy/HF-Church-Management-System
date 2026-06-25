@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
+import { hasPermission } from '@/lib/rbac';
 
 function cleanAction(action: string) {
   return action.replaceAll('_', ' ').replaceAll('.', ' ').toLowerCase();
@@ -15,6 +16,9 @@ function describeAuditLog(log: { action: string; entity: string; entityId?: stri
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'auditLogs.viewDetails') && !hasPermission(session.permissions, 'auditLogs.view')) {
+    return failure('Forbidden', 403);
+  }
 
   const { id } = await params;
   const item = await prisma.auditLog.findFirst({

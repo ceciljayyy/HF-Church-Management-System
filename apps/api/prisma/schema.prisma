@@ -134,6 +134,18 @@ enum SettingType {
   JSON
 }
 
+enum ScopeType {
+  GLOBAL
+  DEPARTMENT
+  SELF
+  NONE
+}
+
+enum PermissionEffect {
+  ALLOW
+  DENY
+}
+
 model Church {
   id        String   @id @default(cuid())
   name      String
@@ -191,9 +203,13 @@ model Branch {
 model User {
   id           String     @id @default(cuid())
   branchId     String
+  personId     String?    @unique
   name         String
+  username     String?    @unique
   email        String     @unique
+  phone        String?
   passwordHash String
+  mustChangePassword Boolean @default(false)
   avatarUrl    String?
   status       UserStatus @default(ACTIVE)
   lastLoginAt  DateTime?
@@ -202,7 +218,10 @@ model User {
   deletedAt    DateTime?
 
   branch                    Branch              @relation(fields: [branchId], references: [id])
+  person                    Person?             @relation(fields: [personId], references: [id], onDelete: SetNull)
   roles                     UserRole[]
+  permissionOverrides       UserPermissionOverride[] @relation("UserPermissionOverrides")
+  grantedPermissionOverrides UserPermissionOverride[] @relation("UserPermissionOverrideGrants")
   createdEvents             Event[]             @relation("EventCreatedBy")
   attendanceSessionsCreated AttendanceSession[] @relation("AttendanceSessionCreatedBy")
   attendanceCheckedIn       AttendanceRecord[]  @relation("AttendanceCheckedInBy")
@@ -216,6 +235,7 @@ model User {
   churchProfilesUpdated     ChurchProfile[]     @relation("ChurchProfileUpdatedBy")
 
   @@index([branchId])
+  @@index([personId])
   @@index([status])
 }
 
@@ -288,16 +308,24 @@ model Role {
 model Permission {
   id          String @id @default(cuid())
   key         String @unique
+  name        String?
   description String?
   module      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   roles RolePermission[]
+  userOverrides UserPermissionOverride[]
 }
 
 model UserRole {
   id     String @id @default(cuid())
   userId String
   roleId String
+  scopeType ScopeType @default(GLOBAL)
+  scopeId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
@@ -305,12 +333,15 @@ model UserRole {
   @@unique([userId, roleId])
   @@index([userId])
   @@index([roleId])
+  @@index([scopeType])
+  @@index([scopeId])
 }
 
 model RolePermission {
   id           String @id @default(cuid())
   roleId       String
   permissionId String
+  createdAt    DateTime @default(now())
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -318,6 +349,29 @@ model RolePermission {
   @@unique([roleId, permissionId])
   @@index([roleId])
   @@index([permissionId])
+}
+
+model UserPermissionOverride {
+  id           String           @id @default(cuid())
+  userId       String
+  permissionId String
+  effect       PermissionEffect
+  scopeType    ScopeType        @default(GLOBAL)
+  scopeId      String?
+  reason       String?
+  grantedById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user      User       @relation("UserPermissionOverrides", fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy User?      @relation("UserPermissionOverrideGrants", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, permissionId, scopeType, scopeId])
+  @@index([userId])
+  @@index([permissionId])
+  @@index([effect])
+  @@index([scopeType])
 }
 
 model Person {
@@ -361,6 +415,7 @@ model Person {
   contributions     Contribution[]
   pledges           Pledge[]
   attendanceRecords AttendanceRecord[]
+  platformUser      User?
 
   @@index([branchId])
   @@index([firstName, lastName])

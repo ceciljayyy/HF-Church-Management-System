@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getAuthedSession, requireBranchId } from '@/lib/people';
+import { canReadPeople, getAuthedSession, requireBranchId } from '@/lib/people';
 
 function fullName(person: { firstName: string; middleName?: string | null; lastName: string; preferredName?: string | null }) {
   return person.preferredName || [person.firstName, person.middleName, person.lastName].filter(Boolean).join(' ');
@@ -10,6 +10,7 @@ function fullName(person: { firstName: string; middleName?: string | null; lastN
 export async function GET(req: NextRequest) {
   const session = await getAuthedSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!canReadPeople(session.permissions)) return failure('Forbidden', 403);
 
   try {
     const branchId = await requireBranchId(session.branchId);

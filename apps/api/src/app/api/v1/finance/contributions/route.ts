@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 const contributionSchema = z.object({
   contributorId: z.string().optional().nullable(),
@@ -23,9 +24,7 @@ const contributionSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 function normalizeEnum(value: string | undefined, fallback: string) {
@@ -35,6 +34,7 @@ function normalizeEnum(value: string | undefined, fallback: string) {
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'finance.view')) return failure('Forbidden', 403);
 
   const url = new URL(req.url);
   const page = Number(url.searchParams.get('page') ?? 1);
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'finance.view')) return failure('Forbidden', 403);
 
     const body = contributionSchema.parse(await req.json());
     if (!body.isAnonymous && !body.contributorName?.trim() && !body.contributorId) {

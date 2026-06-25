@@ -231,7 +231,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = await getAuthedSession(req);
   if (!session) return failure('Unauthorized', 401);
-  if (!hasPermission(session.permissions, 'people.archive')) return failure('Forbidden', 403);
+  if (!hasPermission(session.permissions, 'people.delete')) return failure('Forbidden', 403);
 
   try {
     const url = new URL(req.url);

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { toNumber } from '@/lib/finance';
+import { hasPermission } from '@/lib/rbac';
 
 function sourcePerson(item: any) {
   if (item.isAnonymous) return 'Anonymous';
@@ -13,9 +14,11 @@ function sourcePerson(item: any) {
 
 export async function GET(req: NextRequest) {
   try {
-    const token = getTokenFromRequest(req);
-    if (!token) return failure('Unauthorized', 401);
-    const session = await verifySessionToken(token);
+    const session = await getRequestSession(req);
+    if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'finance.history.view') && !hasPermission(session.permissions, 'finance.view')) {
+      return failure('Forbidden', 403);
+    }
     const branchFilter = { branchId: session.branchId };
 
     const [contributions, expenses, pledges, pledgePayments, funds, receipts] = await Promise.all([

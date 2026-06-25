@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
 import { getRequestSession } from '@/lib/request-session';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
+import { hasPermission } from '@/lib/rbac';
 
 const settingSchema = z.object({
   key: z.string().min(1),
@@ -14,6 +15,7 @@ const settingSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await getRequestSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'settings.view')) return failure('Forbidden', 403);
   const items = await prisma.setting.findMany({
     where: { branchId: session.branchId },
     orderBy: { key: 'asc' },
@@ -25,6 +27,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getRequestSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'settings.updateProfile')) return failure('Forbidden', 403);
     const body = settingSchema.parse(await req.json());
     const existing = await prisma.setting.findUnique({
       where: { branchId_key: { branchId: session.branchId, key: body.key } },

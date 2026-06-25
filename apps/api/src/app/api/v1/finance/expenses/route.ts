@@ -2,10 +2,11 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { failure, success } from '@/lib/http';
-import { getTokenFromRequest, verifySessionToken } from '@/lib/session';
+import { getRequestSession } from '@/lib/request-session';
 import { logFinanceActivity, makeNumber, normalizeDate } from '@/lib/finance';
 import { auditMetaFromRequest, createAuditLog } from '@/lib/audit';
 import { invalidateReportsCache } from '@/lib/cache-invalidation';
+import { hasPermission } from '@/lib/rbac';
 
 const expenseSchema = z.object({
   title: z.string().min(1),
@@ -24,9 +25,7 @@ const expenseSchema = z.object({
 });
 
 async function getSession(req: NextRequest) {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifySessionToken(token);
+  return getRequestSession(req);
 }
 
 function normalizeEnum(value: string | undefined, fallback: string) {
@@ -36,6 +35,9 @@ function normalizeEnum(value: string | undefined, fallback: string) {
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return failure('Unauthorized', 401);
+  if (!hasPermission(session.permissions, 'expenses.view') && !hasPermission(session.permissions, 'expenses.viewDepartmentExpenses')) {
+    return failure('Forbidden', 403);
+  }
 
   const url = new URL(req.url);
   const page = Number(url.searchParams.get('page') ?? 1);
@@ -105,6 +107,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession(req);
     if (!session) return failure('Unauthorized', 401);
+    if (!hasPermission(session.permissions, 'expenses.create') && !hasPermission(session.permissions, 'expenses.createForDepartment')) {
+      return failure('Forbidden', 403);
+    }
     const body = expenseSchema.parse(await req.json());
     const status = normalizeEnum(body.status, 'PENDING') as any;
     const paymentMethod = normalizeEnum(body.paymentMethod, 'CASH') as any;
