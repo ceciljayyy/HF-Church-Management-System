@@ -32,6 +32,7 @@ function isMissingPermissionOverrideStorage(error: unknown) {
 }
 
 let permissionOverrideStorageExists: Promise<boolean> | null = null;
+let userRoleScopeStorageExists: Promise<boolean> | null = null;
 
 async function hasPermissionOverrideStorage() {
   permissionOverrideStorageExists ??= prisma
@@ -48,33 +49,93 @@ async function hasPermissionOverrideStorage() {
   return permissionOverrideStorageExists;
 }
 
-export async function getUserAccess(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      branchId: true,
-      name: true,
-      email: true,
-      avatarUrl: true,
-      status: true,
-      branch: true,
-      roles: {
-        select: {
-          roleId: true,
-          scopeType: true,
-          scopeId: true,
-          role: {
-            select: {
-              id: true,
-              name: true,
-              permissions: { select: { permission: { select: { key: true } } } },
-            },
-          },
-        },
+async function hasUserRoleScopeStorage() {
+  userRoleScopeStorageExists ??= prisma
+    .$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'UserRole'
+          AND column_name IN ('scopeType', 'scopeId')
+        GROUP BY table_name
+        HAVING COUNT(*) = 2
+      ) AS "exists"
+    `
+    .then((rows) => rows[0]?.exists ?? false)
+    .catch(() => false);
+
+  return userRoleScopeStorageExists;
+}
+
+async function findUserForAccess(userId: string) {
+  const roleSelect = {
+    roleId: true,
+    role: {
+      select: {
+        id: true,
+        name: true,
+        permissions: { select: { permission: { select: { key: true } } } },
       },
     },
+  };
+
+  const baseSelect = {
+    id: true,
+    branchId: true,
+    name: true,
+    email: true,
+    avatarUrl: true,
+    mustChangePassword: true,
+    status: true,
+    branch: true,
+  };
+
+  const user = (await hasUserRoleScopeStorage())
+    ? await prisma.user
+        .findUnique({
+          where: { id: userId },
+          select: {
+            ...baseSelect,
+            roles: {
+              select: {
+                ...roleSelect,
+                scopeType: true,
+                scopeId: true,
+              },
+            },
+          },
+        })
+        .catch((error) => {
+          if (isMissingPermissionOverrideStorage(error)) return null;
+          throw error;
+        })
+    : null;
+
+  if (user) return user;
+
+  const fallbackUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      ...baseSelect,
+      roles: { select: roleSelect },
+    },
   });
+
+  if (!fallbackUser) return null;
+
+  return {
+    ...fallbackUser,
+    roles: fallbackUser.roles.map((userRole) => ({
+      ...userRole,
+      scopeType: 'GLOBAL' as const,
+      scopeId: null,
+    })),
+  };
+}
+
+export async function getUserAccess(userId: string) {
+  const user = await findUserForAccess(userId);
 
   if (!user) return null;
 

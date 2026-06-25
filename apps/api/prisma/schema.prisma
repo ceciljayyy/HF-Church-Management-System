@@ -312,20 +312,20 @@ model Permission {
   description String?
   module      String
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime @default(now()) @updatedAt
 
   roles RolePermission[]
   userOverrides UserPermissionOverride[]
 }
 
 model UserRole {
-  id     String @id @default(cuid())
-  userId String
-  roleId String
+  id        String    @id @default(cuid())
+  userId    String
+  roleId    String
   scopeType ScopeType @default(GLOBAL)
-  scopeId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  scopeId   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)

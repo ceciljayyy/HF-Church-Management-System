@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         email: true,
         passwordHash: true,
         avatarUrl: true,
+        mustChangePassword: true,
         status: true,
       },
     });
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
         avatarUrl: user.avatarUrl,
         branchId: user.branchId,
         status: user.status,
-        mustChangePassword: false,
+        mustChangePassword: user.mustChangePassword,
         roles,
         permissions,
       },

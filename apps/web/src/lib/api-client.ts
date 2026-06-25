@@ -1,7 +1,7 @@
 import { requestDashboardRefresh } from './dashboard-refresh';
 
 type ApiSuccess<T> = { success: true; data: T };
-type ApiFailure = { success: false; message: string; details?: unknown };
+type ApiFailure = { success: false; message?: string; details?: unknown; error?: { message?: string } };
 
 async function parseResponse<T>(response: Response) {
   const text = await response.text();
@@ -31,7 +31,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const payload = await parseResponse<T>(response);
   if (!response.ok || !payload.success) {
-    const message = 'message' in payload ? payload.message : 'Request failed';
+    const message = ('error' in payload ? payload.error?.message : undefined) ?? ('message' in payload ? payload.message : undefined) ?? 'Request failed';
     throw new Error(message);
   }
 

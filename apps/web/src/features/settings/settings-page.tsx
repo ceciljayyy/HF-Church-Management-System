@@ -2,11 +2,13 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
 import { PageHeader } from '@/components/ui/page-header';
 
 const inputClass = 'w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-primary outline-none transition placeholder:text-muted focus:border-lime';
+const passwordInputClass = `${inputClass} pr-11`;
 const menu = [
   'Account Centre',
   'Edit Profile',
@@ -33,11 +35,110 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="space-y-2 text-sm text-secondary"><span>{label}</span>{children}</label>;
 }
 
+type PasswordVisibility = {
+  currentPassword: boolean;
+  newPassword: boolean;
+  confirmPassword: boolean;
+};
+
+const hiddenPasswords: PasswordVisibility = {
+  currentPassword: false,
+  newPassword: false,
+  confirmPassword: false,
+};
+
+function getHiddenPasswords() {
+  return { ...hiddenPasswords };
+}
+
+function PasswordField({
+  label,
+  name,
+  visible,
+  onToggle,
+  showLabel,
+  hideLabel,
+  onChange,
+}: {
+  label: string;
+  name: keyof PasswordVisibility;
+  visible: boolean;
+  onToggle: () => void;
+  showLabel: string;
+  hideLabel: string;
+  onChange?: (value: string) => void;
+}) {
+  const Icon = visible ? EyeOff : Eye;
+  const inputId = `settings-${name}`;
+  return (
+    <div className="space-y-2 text-sm text-secondary">
+      <label htmlFor={inputId}>{label}</label>
+      <div className="relative">
+        <input
+          id={inputId}
+          name={name}
+          type={visible ? 'text' : 'password'}
+          className={passwordInputClass}
+          onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        />
+        <button
+          type="button"
+          aria-label={visible ? hideLabel : showLabel}
+          onClick={onToggle}
+          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted transition hover:text-lime focus:outline-none focus:ring-2 focus:ring-lime/60"
+        >
+          <Icon size={18} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function passwordStrength(password: string) {
+  return {
+    length: password.length >= 8,
+    letter: /[A-Za-z]/.test(password),
+    number: /\d/.test(password),
+  };
+}
+
+function StrengthHint({ met, children }: { met: boolean; children: React.ReactNode }) {
+  return <li className={met ? 'text-lime' : 'text-muted'}>{children}</li>;
+}
+
 export function SettingsPageClient({ user }: { user: any }) {
   const router = useRouter();
   const [active, setActive] = useState(menu[0]);
   const [saving, setSaving] = useState(false);
+  const [passwordVisibility, setPasswordVisibility] = useState<PasswordVisibility>(getHiddenPasswords);
+  const [newPasswordValue, setNewPasswordValue] = useState('');
   const profile = user?.profile ?? {};
+
+  function togglePassword(field: keyof PasswordVisibility) {
+    setPasswordVisibility((current) => ({ ...current, [field]: !current[field] }));
+  }
+
+  function resetPasswordState() {
+    setPasswordVisibility(getHiddenPasswords());
+    setNewPasswordValue('');
+  }
+
+  function validatePasswordForm(form: Record<string, FormDataEntryValue>) {
+    const currentPassword = String(form.currentPassword ?? '');
+    const newPassword = String(form.newPassword ?? '');
+    const confirmPassword = String(form.confirmPassword ?? '');
+    const strength = passwordStrength(newPassword);
+
+    if (!currentPassword) return 'Current password is required.';
+    if (!newPassword) return 'New password is required.';
+    if (!confirmPassword) return 'Please confirm your new password.';
+    if (newPassword !== confirmPassword) return 'New passwords do not match.';
+    if (newPassword === currentPassword) return 'New password must be different from current password.';
+    if (!strength.length || !strength.letter || !strength.number) {
+      return 'Password must be at least 8 characters and include a letter and a number.';
+    }
+    return null;
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,18 +175,29 @@ export function SettingsPageClient({ user }: { user: any }) {
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
+    const formElement = event.currentTarget;
     const form = Object.fromEntries(new FormData(event.currentTarget));
+    const validationError = validatePasswordForm(form);
+    if (validationError) {
+      showErrorToast(validationError);
+      return;
+    }
+
+    setSaving(true);
     try {
-      await apiClient.request('/settings/change-password', {
+      await apiClient.request('/auth/change-password', {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          currentPassword: String(form.currentPassword),
+          newPassword: String(form.newPassword),
+        }),
       });
-      event.currentTarget.reset();
+      formElement.reset();
+      resetPasswordState();
       showSuccessToast('Password changed successfully.');
       router.refresh();
     } catch (err) {
-      showErrorToast(err, 'Unable to change password.');
+      showErrorToast(err, 'Unable to change password. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -155,11 +267,40 @@ export function SettingsPageClient({ user }: { user: any }) {
           ) : null}
 
           {active === 'Login and Security' ? (
-            <form className="space-y-4" onSubmit={changePassword}>
+            <form className="space-y-4" onSubmit={changePassword} onReset={resetPasswordState}>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Current password"><input name="currentPassword" type="password" className={inputClass} /></Field>
-                <Field label="New password"><input name="newPassword" type="password" className={inputClass} /></Field>
-                <Field label="Confirm new password"><input name="confirmPassword" type="password" className={inputClass} /></Field>
+                <PasswordField
+                  label="Current password"
+                  name="currentPassword"
+                  visible={passwordVisibility.currentPassword}
+                  onToggle={() => togglePassword('currentPassword')}
+                  showLabel="Show current password"
+                  hideLabel="Hide current password"
+                />
+                <div className="space-y-2">
+                  <PasswordField
+                    label="New password"
+                    name="newPassword"
+                    visible={passwordVisibility.newPassword}
+                    onToggle={() => togglePassword('newPassword')}
+                    showLabel="Show new password"
+                    hideLabel="Hide new password"
+                    onChange={setNewPasswordValue}
+                  />
+                  <ul className="space-y-1 text-xs">
+                    <StrengthHint met={passwordStrength(newPasswordValue).length}>At least 8 characters</StrengthHint>
+                    <StrengthHint met={passwordStrength(newPasswordValue).letter}>Contains a letter</StrengthHint>
+                    <StrengthHint met={passwordStrength(newPasswordValue).number}>Contains a number</StrengthHint>
+                  </ul>
+                </div>
+                <PasswordField
+                  label="Confirm new password"
+                  name="confirmPassword"
+                  visible={passwordVisibility.confirmPassword}
+                  onToggle={() => togglePassword('confirmPassword')}
+                  showLabel="Show confirm password"
+                  hideLabel="Hide confirm password"
+                />
               </div>
               <Toggle label="Two-factor authentication placeholder" defaultChecked={false} />
               <p className="text-sm text-secondary">Active sessions and logout-all controls will use backend session records when enabled.</p>

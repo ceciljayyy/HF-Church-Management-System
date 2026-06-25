@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       branchId: access.user.branchId,
       branch: access.user.branch,
       status: access.user.status,
-      mustChangePassword: false,
+      mustChangePassword: access.user.mustChangePassword,
       roles: access.roles.map((role) => role.name),
       permissions: access.permissions,
       profile: profileSetting?.value ?? null,
