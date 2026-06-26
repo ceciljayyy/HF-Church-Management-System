@@ -17,22 +17,19 @@ export async function GET(req: NextRequest) {
   try {
     const branchId = await requireBranchId(session.branchId);
     const month = numberParam(req.nextUrl.searchParams.get('month'));
-    const ageMin = numberParam(req.nextUrl.searchParams.get('ageMin'));
-    const ageMax = numberParam(req.nextUrl.searchParams.get('ageMax'));
     const week = req.nextUrl.searchParams.get('week') as 'thisWeek' | 'nextWeek' | 'month' | null;
     const currentMonth = new Date().getUTCMonth() + 1;
+    const filter = week === 'thisWeek' ? 'thisWeek' : week === 'month' ? 'thisMonth' : 'all';
 
     const celebrants = await getBirthdayCelebrants(branchId, {
       month: month && month >= 1 && month <= 12 ? month : week === 'month' ? currentMonth : undefined,
-      week: week === 'thisWeek' || week === 'nextWeek' || week === 'month' ? week : undefined,
-      ageMin,
-      ageMax,
+      filter,
       classification: req.nextUrl.searchParams.get('classification') || undefined,
       gender: req.nextUrl.searchParams.get('gender') || undefined,
       search: req.nextUrl.searchParams.get('search') || undefined,
     });
 
-    return success({ data: groupCelebrantsByMonth(celebrants) });
+    return success({ data: groupCelebrantsByMonth(celebrants, false) });
   } catch (error) {
     return failure('Unable to load birthday celebrants', 500, error);
   }

@@ -146,6 +146,39 @@ enum PermissionEffect {
   DENY
 }
 
+enum PreferredCommunicationChannel {
+  SMS
+  WHATSAPP
+  BOTH
+  NONE
+}
+
+enum CommunicationChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+  CALL
+  MANUAL
+}
+
+enum CommunicationPurpose {
+  BIRTHDAY
+  EVENT
+  WELFARE
+  ANNOUNCEMENT
+  TEST
+  MANUAL
+}
+
+enum CommunicationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+  MOCK_SENT
+  MANUAL
+}
+
 model Church {
   id        String   @id @default(cuid())
   name      String
@@ -194,6 +227,7 @@ model Branch {
   churchProfile      ChurchProfile?
   auditLogs          AuditLog[]
   activityLogs       ActivityLog[]
+  communicationLogs  CommunicationLog[]
 
   @@unique([churchId, name])
   @@index([churchId])
@@ -231,6 +265,7 @@ model User {
   pledgePaymentsReceived    PledgePayment[]     @relation("PledgePaymentReceivedBy")
   auditLogs                 AuditLog[]
   activityLogs              ActivityLog[]
+  sentCommunicationLogs     CommunicationLog[]  @relation("CommunicationLogSentBy")
   churchProfilesCreated     ChurchProfile[]     @relation("ChurchProfileCreatedBy")
   churchProfilesUpdated     ChurchProfile[]     @relation("ChurchProfileUpdatedBy")
 
@@ -403,6 +438,15 @@ model Person {
   friendDate      DateTime?
   profilePhotoUrl String?
   notes           String?
+  whatsappNumber  String?
+  allowSms        Boolean   @default(true)
+  allowBirthdaySms Boolean  @default(true)
+  allowEventSms   Boolean   @default(true)
+  allowWelfareSms Boolean   @default(true)
+  allowWhatsApp   Boolean   @default(false)
+  allowBirthdayWhatsApp Boolean @default(false)
+  preferredCommunicationChannel PreferredCommunicationChannel @default(SMS)
+  doNotContact    Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
@@ -416,6 +460,7 @@ model Person {
   pledges           Pledge[]
   attendanceRecords AttendanceRecord[]
   platformUser      User?
+  communicationLogs CommunicationLog[]
 
   @@index([branchId])
   @@index([firstName, lastName])
@@ -802,4 +847,36 @@ model ActivityLog {
   user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([branchId])
+}
+
+model CommunicationLog {
+  id                String              @id @default(cuid())
+  branchId          String
+  channel           CommunicationChannel
+  purpose           CommunicationPurpose
+  recipientPersonId String?
+  recipientName     String?
+  recipientPhone    String?
+  message           String
+  provider          String?
+  senderId          String?
+  status            CommunicationStatus
+  providerMessageId String?
+  errorMessage      String?
+  rawResponseJson   Json?
+  sentByUserId      String?
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  branch          Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  recipientPerson Person? @relation(fields: [recipientPersonId], references: [id], onDelete: SetNull)
+  sentByUser      User?   @relation("CommunicationLogSentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([branchId])
+  @@index([channel])
+  @@index([purpose])
+  @@index([status])
+  @@index([recipientPersonId])
+  @@index([sentAt])
 }

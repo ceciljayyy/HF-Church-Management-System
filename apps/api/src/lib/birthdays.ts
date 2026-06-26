@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { normalizeGhanaPhone } from './phone';
 
 export const monthNames = [
   'January',
@@ -16,13 +17,14 @@ export const monthNames = [
 ] as const;
 
 type BirthdayFilters = {
+  filter?: 'today' | 'thisWeek' | 'thisMonth' | 'all';
   month?: number;
-  week?: 'thisWeek' | 'nextWeek' | 'month';
-  ageMin?: number;
-  ageMax?: number;
+  limit?: number;
+  search?: string;
+  departmentId?: string;
+  channel?: 'sms' | 'whatsapp' | 'both' | 'any';
   classification?: string;
   gender?: string;
-  search?: string;
 };
 
 function fullName(person: { firstName: string; middleName?: string | null; lastName: string; preferredName?: string | null }) {
@@ -71,10 +73,20 @@ function normalizedGenderFilter(value?: string) {
   return value.trim().toUpperCase().replaceAll(' ', '_');
 }
 
-function matchesWeek(daysUntilBirthday: number, week?: BirthdayFilters['week']) {
-  if (!week || week === 'month') return true;
-  if (week === 'thisWeek') return daysUntilBirthday <= 7;
-  if (week === 'nextWeek') return daysUntilBirthday > 7 && daysUntilBirthday <= 14;
+function matchesFilter(person: { month: number; day: number; daysUntilBirthday: number }, filter?: BirthdayFilters['filter']) {
+  const today = new Date();
+  if (!filter || filter === 'all') return true;
+  if (filter === 'today') return person.daysUntilBirthday === 0;
+  if (filter === 'thisWeek') return person.daysUntilBirthday >= 0 && person.daysUntilBirthday <= 7;
+  if (filter === 'thisMonth') return person.month === today.getUTCMonth() + 1;
+  return true;
+}
+
+function matchesChannel(person: { canReceiveSms: boolean; canReceiveWhatsApp: boolean }, channel?: BirthdayFilters['channel']) {
+  if (!channel || channel === 'any') return true;
+  if (channel === 'sms') return person.canReceiveSms;
+  if (channel === 'whatsapp') return person.canReceiveWhatsApp;
+  if (channel === 'both') return person.canReceiveSms && person.canReceiveWhatsApp;
   return true;
 }
 
@@ -90,6 +102,13 @@ export async function getBirthdayCelebrants(branchId: string, filters: BirthdayF
       dateOfBirth: { not: null },
       ...(filters.classification ? { classification: filters.classification } : {}),
       ...(gender ? { gender: gender as any } : {}),
+      ...(filters.departmentId
+        ? {
+            groupMemberships: {
+              some: { groupId: filters.departmentId, group: { type: 'DEPARTMENT', deletedAt: null } },
+            },
+          }
+        : {}),
     },
     select: {
       id: true,
@@ -103,61 +122,94 @@ export async function getBirthdayCelebrants(branchId: string, filters: BirthdayF
       mobilePhone: true,
       email: true,
       classification: true,
+      whatsappNumber: true,
+      allowSms: true,
+      allowBirthdaySms: true,
+      allowWhatsApp: true,
+      allowBirthdayWhatsApp: true,
+      preferredCommunicationChannel: true,
+      doNotContact: true,
+      groupMemberships: {
+        where: { group: { type: 'DEPARTMENT', deletedAt: null } },
+        select: { group: { select: { id: true, name: true } } },
+        take: 1,
+      },
     },
   });
 
-  return people
-    .map((person) => {
-      const dateOfBirth = person.dateOfBirth as Date;
-      const birthdayMonth = dateOfBirth.getUTCMonth() + 1;
-      const birthdayDay = dateOfBirth.getUTCDate();
-      const name = fullName(person);
-      const age = calculateAge(dateOfBirth, today);
-      const daysUntilBirthday = calculateDaysUntilBirthday(dateOfBirth, today);
+  const mapped = people.map((person) => {
+    const dateOfBirth = person.dateOfBirth as Date;
+    const month = dateOfBirth.getUTCMonth() + 1;
+    const day = dateOfBirth.getUTCDate();
+    const name = fullName(person);
+    const phone = person.mobilePhone ?? person.phone ?? null;
+    const normalizedSmsPhone = normalizeGhanaPhone(phone);
+    const normalizedWhatsAppPhone = normalizeGhanaPhone(person.whatsappNumber ?? phone);
+    const canReceiveSms = Boolean(!person.doNotContact && person.allowSms && person.allowBirthdaySms && normalizedSmsPhone);
+    const canReceiveWhatsApp = Boolean(!person.doNotContact && person.allowWhatsApp && person.allowBirthdayWhatsApp && normalizedWhatsAppPhone);
+    const department = person.groupMemberships[0]?.group;
 
-      return {
-        id: person.id,
-        firstName: person.firstName,
-        lastName: person.lastName,
-        fullName: name,
-        phone: person.mobilePhone ?? person.phone ?? null,
-        email: person.email,
-        gender: genderLabel(person.gender),
-        classification: person.classification ?? 'Unassigned',
-        dateOfBirth: dateOfBirth.toISOString().slice(0, 10),
-        birthdayLabel: dateLabel(dateOfBirth),
-        birthdayMonth,
-        birthdayDay,
-        month: birthdayMonth,
-        monthName: monthNames[birthdayMonth - 1],
-        day: birthdayDay,
-        age,
-        daysUntilBirthday,
-        isToday: daysUntilBirthday === 0,
-      };
-    })
-    .filter((person) => !filters.month || person.birthdayMonth === filters.month)
-    .filter((person) => matchesWeek(person.daysUntilBirthday, filters.week))
-    .filter((person) => filters.ageMin === undefined || person.age >= filters.ageMin)
-    .filter((person) => filters.ageMax === undefined || person.age <= filters.ageMax)
+    return {
+      id: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      fullName: name,
+      phone,
+      whatsappNumber: person.whatsappNumber ?? null,
+      email: person.email,
+      gender: genderLabel(person.gender),
+      classification: person.classification ?? 'Unassigned',
+      dateOfBirth: dateOfBirth.toISOString().slice(0, 10),
+      birthdayLabel: dateLabel(dateOfBirth),
+      birthdayMonth: month,
+      birthdayDay: day,
+      month,
+      monthName: monthNames[month - 1],
+      day,
+      age: calculateAge(dateOfBirth, today),
+      daysUntilBirthday: calculateDaysUntilBirthday(dateOfBirth, today),
+      isToday: calculateDaysUntilBirthday(dateOfBirth, today) === 0,
+      departmentId: department?.id ?? null,
+      departmentName: department?.name ?? null,
+      preferredCommunicationChannel: person.preferredCommunicationChannel,
+      canReceiveSms,
+      canReceiveWhatsApp,
+      doNotContact: person.doNotContact,
+      allowSms: person.allowSms,
+      allowBirthdaySms: person.allowBirthdaySms,
+      allowWhatsApp: person.allowWhatsApp,
+      allowBirthdayWhatsApp: person.allowBirthdayWhatsApp,
+    };
+  });
+
+  const filtered = mapped
+    .filter((person) => !filters.month || person.month === filters.month)
+    .filter((person) => matchesFilter(person, filters.filter))
+    .filter((person) => matchesChannel(person, filters.channel))
     .filter((person) => {
       if (!search) return true;
-      return [person.fullName, person.phone, person.email, person.classification, person.gender].some((value) =>
+      return [person.fullName, person.phone, person.whatsappNumber, person.email, person.departmentName].some((value) =>
         value?.toLowerCase().includes(search),
       );
     })
-    .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday || a.fullName.localeCompare(b.fullName));
+    .sort((a, b) => a.month - b.month || a.day - b.day || a.fullName.localeCompare(b.fullName));
+
+  return filters.limit && filters.limit > 0 ? filtered.slice(0, filters.limit) : filtered;
 }
 
-export function groupCelebrantsByMonth(celebrants: Awaited<ReturnType<typeof getBirthdayCelebrants>>) {
-  return monthNames
-    .map((month, index) => ({
+export function groupCelebrantsByMonth(celebrants: Awaited<ReturnType<typeof getBirthdayCelebrants>>, includeEmpty = true) {
+  return monthNames.map((monthName, index) => {
+    const month = index + 1;
+    const people = celebrants
+      .filter((person) => person.month === month)
+      .sort((a, b) => a.day - b.day || a.fullName.localeCompare(b.fullName));
+    return {
       month,
-      monthName: month,
-      monthNumber: index + 1,
-      celebrants: celebrants
-        .filter((person) => person.birthdayMonth === index + 1)
-        .sort((a, b) => a.birthdayDay - b.birthdayDay || a.fullName.localeCompare(b.fullName)),
-    }))
-    .filter((group) => group.celebrants.length > 0);
+      monthNumber: month,
+      monthName,
+      label: monthName,
+      count: people.length,
+      celebrants: people,
+    };
+  }).filter((group) => includeEmpty || group.celebrants.length > 0);
 }

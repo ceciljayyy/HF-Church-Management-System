@@ -451,6 +451,15 @@ function EditPersonDialog({
   const [email, setEmail] = useState(person.email ?? '');
   const [mobilePhone, setMobilePhone] = useState(person.mobilePhone ?? person.phone ?? '');
   const [dateOfBirth, setDateOfBirth] = useState(person.dateOfBirth?.slice(0, 10) ?? '');
+  const [whatsappNumber, setWhatsappNumber] = useState(person.whatsappNumber ?? '');
+  const [preferredCommunicationChannel, setPreferredCommunicationChannel] = useState<PersonRecord['preferredCommunicationChannel']>(person.preferredCommunicationChannel ?? 'SMS');
+  const [allowSms, setAllowSms] = useState(person.allowSms ?? true);
+  const [allowBirthdaySms, setAllowBirthdaySms] = useState(person.allowBirthdaySms ?? true);
+  const [allowEventSms, setAllowEventSms] = useState(person.allowEventSms ?? true);
+  const [allowWelfareSms, setAllowWelfareSms] = useState(person.allowWelfareSms ?? true);
+  const [allowWhatsApp, setAllowWhatsApp] = useState(person.allowWhatsApp ?? false);
+  const [allowBirthdayWhatsApp, setAllowBirthdayWhatsApp] = useState(person.allowBirthdayWhatsApp ?? false);
+  const [doNotContact, setDoNotContact] = useState(person.doNotContact ?? false);
   const [classification, setClassification] = useState(person.classification ?? 'Unassigned');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -473,6 +482,15 @@ function EditPersonDialog({
           email,
           mobilePhone,
           dateOfBirth: dateOfBirth || null,
+          whatsappNumber,
+          preferredCommunicationChannel,
+          allowSms,
+          allowBirthdaySms,
+          allowEventSms,
+          allowWelfareSms,
+          allowWhatsApp,
+          allowBirthdayWhatsApp,
+          doNotContact,
           classification,
         }),
       });
@@ -514,8 +532,21 @@ function EditPersonDialog({
             <input className={inputClass} value={mobilePhone} onChange={(event) => setMobilePhone(event.target.value)} />
           </label>
           <label className="space-y-2 text-sm text-secondary">
+            <span>WhatsApp Number</span>
+            <input className={inputClass} value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)} />
+          </label>
+          <label className="space-y-2 text-sm text-secondary">
             <span>Date of Birth</span>
             <input className={inputClass} type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} />
+          </label>
+          <label className="space-y-2 text-sm text-secondary">
+            <span>Preferred Channel</span>
+            <select className={inputClass} value={preferredCommunicationChannel} onChange={(event) => setPreferredCommunicationChannel(event.target.value as PersonRecord['preferredCommunicationChannel'])}>
+              <option value="SMS">SMS</option>
+              <option value="WHATSAPP">WhatsApp</option>
+              <option value="BOTH">Both</option>
+              <option value="NONE">None</option>
+            </select>
           </label>
           <label className="space-y-2 text-sm text-secondary md:col-span-2">
             <span>Classification</span>
@@ -523,6 +554,22 @@ function EditPersonDialog({
               {['Unassigned', 'Visitor', 'First Timer', 'Regular Attendee', 'Member', 'Leader', 'Pastor', 'Staff'].map((item) => <option key={item}>{item}</option>)}
             </select>
           </label>
+          <div className="grid gap-2 md:col-span-2 md:grid-cols-2">
+            {[
+              ['Allow SMS messages', allowSms, setAllowSms],
+              ['Allow birthday SMS', allowBirthdaySms, setAllowBirthdaySms],
+              ['Allow event SMS', allowEventSms, setAllowEventSms],
+              ['Allow welfare SMS', allowWelfareSms, setAllowWelfareSms],
+              ['Allow WhatsApp messages', allowWhatsApp, setAllowWhatsApp],
+              ['Allow birthday WhatsApp', allowBirthdayWhatsApp, setAllowBirthdayWhatsApp],
+              ['Do not contact', doNotContact, setDoNotContact],
+            ].map(([label, checked, setter]) => (
+              <label key={String(label)} className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-secondary">
+                <input type="checkbox" checked={Boolean(checked)} onChange={(event) => (setter as (value: boolean) => void)(event.target.checked)} className="h-4 w-4 accent-lime" />
+                {label as string}
+              </label>
+            ))}
+          </div>
         </div>
         <div className="flex justify-end gap-3 border-t border-border pt-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary transition hover:bg-hover hover:text-primary">Cancel</button>

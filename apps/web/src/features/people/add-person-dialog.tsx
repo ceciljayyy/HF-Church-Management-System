@@ -31,8 +31,17 @@ type FormState = {
   homePhone: string;
   mobilePhone: string;
   workPhone: string;
+  whatsappNumber: string;
   email: string;
   otherEmail: string;
+  preferredCommunicationChannel: 'SMS' | 'WHATSAPP' | 'BOTH' | 'NONE';
+  allowSms: boolean;
+  allowBirthdaySms: boolean;
+  allowEventSms: boolean;
+  allowWelfareSms: boolean;
+  allowWhatsApp: boolean;
+  allowBirthdayWhatsApp: boolean;
+  doNotContact: boolean;
   facebook: string;
   x: string;
   linkedin: string;
@@ -60,8 +69,17 @@ const initialForm: FormState = {
   homePhone: '',
   mobilePhone: '',
   workPhone: '',
+  whatsappNumber: '',
   email: '',
   otherEmail: '',
+  preferredCommunicationChannel: 'SMS',
+  allowSms: true,
+  allowBirthdaySms: true,
+  allowEventSms: true,
+  allowWelfareSms: true,
+  allowWhatsApp: false,
+  allowBirthdayWhatsApp: false,
+  doNotContact: false,
   facebook: '',
   x: '',
   linkedin: '',
@@ -163,8 +181,17 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
           homePhone: form.homePhone,
           mobilePhone: form.mobilePhone,
           workPhone: form.workPhone,
+          whatsappNumber: form.whatsappNumber,
           email: form.email,
           otherEmail: form.otherEmail,
+          preferredCommunicationChannel: form.preferredCommunicationChannel,
+          allowSms: form.allowSms,
+          allowBirthdaySms: form.allowBirthdaySms,
+          allowEventSms: form.allowEventSms,
+          allowWelfareSms: form.allowWelfareSms,
+          allowWhatsApp: form.allowWhatsApp,
+          allowBirthdayWhatsApp: form.allowBirthdayWhatsApp,
+          doNotContact: form.doNotContact,
           facebook: form.facebook,
           x: form.x,
           linkedin: form.linkedin,
@@ -248,8 +275,42 @@ export function AddPersonDialog({ open, onClose, onCreated }: Props) {
             <FormField label="Home Phone"><input className={inputClass} value={form.homePhone} onChange={(event) => update('homePhone', event.target.value)} /></FormField>
             <FormField label="Mobile Phone"><input className={inputClass} value={form.mobilePhone} onChange={(event) => update('mobilePhone', event.target.value)} /></FormField>
             <FormField label="Work Phone"><input className={inputClass} value={form.workPhone} onChange={(event) => update('workPhone', event.target.value)} /></FormField>
+            <FormField label="WhatsApp Number"><input className={inputClass} value={form.whatsappNumber} onChange={(event) => update('whatsappNumber', event.target.value)} /></FormField>
             <FormField label="Email"><input className={inputClass} type="email" value={form.email} onChange={(event) => update('email', event.target.value)} /></FormField>
             <FormField label="Other Email"><input className={inputClass} type="email" value={form.otherEmail} onChange={(event) => update('otherEmail', event.target.value)} /></FormField>
+          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <h4 className="mb-4 text-sm font-semibold text-primary">Communication Preferences</h4>
+          <div className="grid gap-4 md:grid-cols-3">
+            <FormField label="Preferred Channel">
+              <select className={inputClass} value={form.preferredCommunicationChannel} onChange={(event) => update('preferredCommunicationChannel', event.target.value as FormState['preferredCommunicationChannel'])}>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="BOTH">Both</option>
+                <option value="NONE">None</option>
+              </select>
+            </FormField>
+            {[
+              ['allowSms', 'Allow SMS messages'],
+              ['allowBirthdaySms', 'Allow birthday SMS'],
+              ['allowEventSms', 'Allow event SMS'],
+              ['allowWelfareSms', 'Allow welfare SMS'],
+              ['allowWhatsApp', 'Allow WhatsApp messages'],
+              ['allowBirthdayWhatsApp', 'Allow birthday WhatsApp'],
+              ['doNotContact', 'Do not contact'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm text-secondary">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form[key as keyof FormState])}
+                  onChange={(event) => update(key as keyof FormState, event.target.checked as never)}
+                  className="h-4 w-4 accent-lime"
+                />
+                {label}
+              </label>
+            ))}
           </div>
         </section>
 

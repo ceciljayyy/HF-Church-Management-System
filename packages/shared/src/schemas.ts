@@ -71,6 +71,15 @@ export const personSchema = z.object({
   occupation: z.string().nullable(),
   profilePhotoUrl: z.string().url().nullable(),
   notes: z.string().nullable(),
+  whatsappNumber: z.string().nullable(),
+  allowSms: z.boolean(),
+  allowBirthdaySms: z.boolean(),
+  allowEventSms: z.boolean(),
+  allowWelfareSms: z.boolean(),
+  allowWhatsApp: z.boolean(),
+  allowBirthdayWhatsApp: z.boolean(),
+  preferredCommunicationChannel: z.enum(['SMS', 'WHATSAPP', 'BOTH', 'NONE']),
+  doNotContact: z.boolean(),
   createdAt: dateStringSchema,
   updatedAt: dateStringSchema,
 });
@@ -89,6 +98,15 @@ const optionalDate = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
   z.string().trim().optional(),
 );
+
+const optionalBoolean = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (['yes', 'true', '1', 'y'].includes(normalized)) return true;
+  if (['no', 'false', '0', 'n'].includes(normalized)) return false;
+  return value;
+}, z.boolean().optional());
 
 export const peopleQuerySchema = paginationQuerySchema.extend({
   status: z.string().trim().optional(),
@@ -123,6 +141,15 @@ export const createPersonSchema = z.object({
   departmentId: optionalText,
   departmentPosition: optionalText,
   departmentRoleType: z.enum(['HEAD', 'MEMBER']).optional(),
+  whatsappNumber: optionalText,
+  allowSms: z.boolean().default(true),
+  allowBirthdaySms: z.boolean().default(true),
+  allowEventSms: z.boolean().default(true),
+  allowWelfareSms: z.boolean().default(true),
+  allowWhatsApp: z.boolean().default(false),
+  allowBirthdayWhatsApp: z.boolean().default(false),
+  preferredCommunicationChannel: z.enum(['SMS', 'WHATSAPP', 'BOTH', 'NONE']).default('SMS'),
+  doNotContact: z.boolean().default(false),
   notes: optionalText,
 });
 
@@ -142,6 +169,13 @@ export const importPeopleRowSchema = z
     occupation: optionalText,
     membershipDate: optionalDate,
     department: optionalText,
+    whatsappNumber: optionalText,
+    preferredCommunicationChannel: z.enum(['SMS', 'WHATSAPP', 'BOTH', 'NONE']).optional(),
+    allowSms: optionalBoolean,
+    allowBirthdaySms: optionalBoolean,
+    allowWhatsApp: optionalBoolean,
+    allowBirthdayWhatsApp: optionalBoolean,
+    doNotContact: optionalBoolean,
     notes: optionalText,
   })
   .refine((row) => Boolean(row.fullName || (row.firstName && row.lastName)), {

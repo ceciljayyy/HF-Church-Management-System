@@ -1,7 +1,7 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { showErrorToast, showSuccessToast } from '@/lib/toast';
@@ -14,6 +14,7 @@ const menu = [
   'Edit Profile',
   'Login and Security',
   'Notifications',
+  'Communications',
   'Appearance',
   'Language and Region',
   'Church Profile',
@@ -108,7 +109,8 @@ function StrengthHint({ met, children }: { met: boolean; children: React.ReactNo
 
 export function SettingsPageClient({ user }: { user: any }) {
   const router = useRouter();
-  const [active, setActive] = useState(menu[0]);
+  const searchParams = useSearchParams();
+  const [active, setActive] = useState(searchParams.get('tab') === 'communications' ? 'Communications' : menu[0]);
   const [saving, setSaving] = useState(false);
   const [passwordVisibility, setPasswordVisibility] = useState<PasswordVisibility>(getHiddenPasswords);
   const [newPasswordValue, setNewPasswordValue] = useState('');
@@ -309,6 +311,7 @@ export function SettingsPageClient({ user }: { user: any }) {
           ) : null}
 
           {active === 'Notifications' ? <SettingsForm onSubmit={save} fields={['Email notifications', 'SMS notifications', 'WhatsApp notifications', 'In-app notifications', 'Finance alerts', 'Welfare reminders', 'Attendance reminders', 'Department updates']} /> : null}
+          {active === 'Communications' ? <CommunicationsSettings /> : null}
           {active === 'Appearance' ? (
             <form className="space-y-4" onSubmit={save}>
               <div className="grid gap-4 md:grid-cols-2">
@@ -343,6 +346,130 @@ function RegionForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>
 
 function SystemPreferencesForm({ onSubmit }: { onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return <form className="space-y-4" onSubmit={onSubmit}><div className="grid gap-4 md:grid-cols-2"><Field label="Default currency"><input name="currency" className={inputClass} defaultValue="GHS" /></Field><Field label="Date format"><input name="dateFormat" className={inputClass} defaultValue="DD/MM/YYYY" /></Field><Field label="Vehicle types"><input name="vehicleTypes" className={inputClass} defaultValue="Cars, Bicycles, Motors/Motorbikes" /></Field><Field label="Default department role"><input name="defaultDepartmentRole" className={inputClass} defaultValue="Member" /></Field></div><Toggle label="Enable finance approvals" /><Toggle label="Enable receipts" /><Toggle label="Enable fund targets" /><Toggle label="Enable custom attendance sections" /><SaveActions /></form>;
+}
+
+type SmsSettings = {
+  enabled: boolean;
+  provider: string;
+  senderId: string;
+  apiKey: string;
+  apiSecret: string;
+  baseUrl: string;
+  defaultBirthdayMessage: string;
+  defaultEventMessage: string;
+  defaultWelfareMessage: string;
+};
+
+function CommunicationsSettings() {
+  const [settings, setSettings] = useState<SmsSettings>({
+    enabled: false,
+    provider: 'mock',
+    senderId: 'HOLYFAMILY',
+    apiKey: '',
+    apiSecret: '',
+    baseUrl: '',
+    defaultBirthdayMessage: 'Happy birthday, {firstName}! God bless you and increase you on every side. From {churchName}.',
+    defaultEventMessage: '',
+    defaultWelfareMessage: '',
+  });
+  const [testPhone, setTestPhone] = useState('');
+  const [testMessage, setTestMessage] = useState('Test SMS from Holy Family CMS.');
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadSettings() {
+      try {
+        const payload = await apiClient.request<{ item: SmsSettings }>('/communications/sms/settings');
+        if (mounted) setSettings((current) => ({ ...current, ...payload.item }));
+      } catch (err) {
+        showErrorToast(err, 'Unable to load communication settings.');
+      }
+    }
+    loadSettings();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function update<K extends keyof SmsSettings>(key: K, value: SmsSettings[K]) {
+    setSettings((current) => ({ ...current, [key]: value }));
+  }
+
+  async function saveSmsSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const payload = await apiClient.request<{ item: SmsSettings; message?: string }>('/communications/sms/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(settings),
+      });
+      setSettings((current) => ({ ...current, ...payload.item }));
+      showSuccessToast(payload.message ?? 'Communication settings saved.');
+    } catch (err) {
+      showErrorToast(err, 'Unable to save communication settings.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendTestSms() {
+    if (!testPhone.trim()) {
+      showErrorToast('Enter a test phone number.');
+      return;
+    }
+    setTesting(true);
+    try {
+      const payload = await apiClient.request<{ message: string }>('/communications/sms/test', {
+        method: 'POST',
+        body: JSON.stringify({ phone: testPhone, message: testMessage }),
+      });
+      showSuccessToast(payload.message ?? 'Test SMS sent successfully.');
+    } catch (err) {
+      showErrorToast(err, 'Unable to send test SMS.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <form className="space-y-5" onSubmit={saveSmsSettings}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-secondary md:col-span-2">
+          <span>Enable SMS</span>
+          <input type="checkbox" checked={settings.enabled} onChange={(event) => update('enabled', event.target.checked)} className="h-4 w-4 accent-lime" />
+        </label>
+        <Field label="SMS Provider">
+          <select name="provider" className={inputClass} value={settings.provider} onChange={(event) => update('provider', event.target.value)}>
+            <option value="mock">Mock / Testing</option>
+            <option value="custom_http">Custom HTTP</option>
+            <option value="hubtel">Hubtel</option>
+            <option value="africas_talking">Africa&apos;s Talking</option>
+            <option value="arkesel">Arkesel</option>
+            <option value="mtn">MTN</option>
+            <option value="bulksms_ghana">BulkSMS Ghana</option>
+          </select>
+        </Field>
+        <Field label="Sender ID"><input className={inputClass} value={settings.senderId} onChange={(event) => update('senderId', event.target.value)} /></Field>
+        <Field label="API Key"><input className={inputClass} type="password" value={settings.apiKey} onChange={(event) => update('apiKey', event.target.value)} placeholder="********" /></Field>
+        <Field label="API Secret / Token"><input className={inputClass} type="password" value={settings.apiSecret} onChange={(event) => update('apiSecret', event.target.value)} placeholder="********" /></Field>
+        <Field label="Base URL"><input className={inputClass} value={settings.baseUrl} onChange={(event) => update('baseUrl', event.target.value)} /></Field>
+      </div>
+      <Field label="Default birthday message"><textarea className={inputClass} rows={3} value={settings.defaultBirthdayMessage} onChange={(event) => update('defaultBirthdayMessage', event.target.value)} /></Field>
+      <Field label="Default event announcement message"><textarea className={inputClass} rows={2} value={settings.defaultEventMessage} onChange={(event) => update('defaultEventMessage', event.target.value)} /></Field>
+      <Field label="Default welfare reminder message"><textarea className={inputClass} rows={2} value={settings.defaultWelfareMessage} onChange={(event) => update('defaultWelfareMessage', event.target.value)} /></Field>
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold text-primary">Test SMS</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-[14rem_minmax(0,1fr)_auto]">
+          <input className={inputClass} value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="+233242277563" />
+          <input className={inputClass} value={testMessage} onChange={(event) => setTestMessage(event.target.value)} />
+          <button type="button" onClick={sendTestSms} disabled={testing} className="rounded-lg border border-lime/40 px-4 py-3 text-sm font-semibold text-lime transition hover:bg-lime/10 disabled:opacity-60">{testing ? 'Sending...' : 'Send Test SMS'}</button>
+        </div>
+      </div>
+      <SaveActions saving={saving} />
+    </form>
+  );
 }
 
 function Placeholder({ title, lines }: { title: string; lines: string[] }) {

@@ -14,6 +14,13 @@ const columns = [
   'Membership Date',
   'Date of Birth',
   'Department',
+  'WhatsApp Number',
+  'Preferred Communication Channel',
+  'Allow SMS',
+  'Allow Birthday SMS',
+  'Allow WhatsApp',
+  'Allow Birthday WhatsApp',
+  'Do Not Contact',
   'Notes',
 ];
 
@@ -35,6 +42,6 @@ export async function GET(req: NextRequest) {
 
   return success({
     fileName: 'people-import-template.csv',
-    content: `${columns.join(',')}\nAma,Boateng,Female,0240000001,ama@example.com,Dansoman,Member,2026-06-13,1995-04-02,Choir,Choir member\n`,
+    content: `${columns.join(',')}\nAma,Boateng,Female,0240000001,ama@example.com,Dansoman,Member,2026-06-13,1995-04-02,Choir,0240000001,SMS,Yes,Yes,No,No,No,Choir member\n`,
   });
 }

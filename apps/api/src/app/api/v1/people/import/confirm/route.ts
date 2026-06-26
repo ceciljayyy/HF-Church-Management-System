@@ -59,6 +59,13 @@ export async function POST(req: NextRequest) {
               address: row.data.address ?? undefined,
               occupation: row.data.occupation ?? undefined,
               classification: row.data.classification ?? undefined,
+              whatsappNumber: row.data.whatsappNumber ?? undefined,
+              preferredCommunicationChannel: row.data.preferredCommunicationChannel ?? undefined,
+              allowSms: row.data.allowSms ?? undefined,
+              allowBirthdaySms: row.data.allowBirthdaySms ?? undefined,
+              allowWhatsApp: row.data.allowWhatsApp ?? undefined,
+              allowBirthdayWhatsApp: row.data.allowBirthdayWhatsApp ?? undefined,
+              doNotContact: row.data.doNotContact ?? undefined,
               notes: row.data.notes ?? undefined,
             },
           });

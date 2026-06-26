@@ -151,6 +151,15 @@ export function normalizeImportRow(row: ImportPeopleRowInput): CreatePersonInput
     occupation: row.occupation,
     classification: normalizeClassification(row.classification),
     membershipDate: row.membershipDate,
+    whatsappNumber: row.whatsappNumber,
+    preferredCommunicationChannel: row.preferredCommunicationChannel ?? 'SMS',
+    allowSms: row.allowSms ?? true,
+    allowBirthdaySms: row.allowBirthdaySms ?? true,
+    allowEventSms: true,
+    allowWelfareSms: true,
+    allowWhatsApp: row.allowWhatsApp ?? false,
+    allowBirthdayWhatsApp: row.allowBirthdayWhatsApp ?? false,
+    doNotContact: row.doNotContact ?? false,
     notes: row.notes,
   };
 }
@@ -181,6 +190,15 @@ export function personData(input: CreatePersonInput, branchId: string) {
     classification: normalizeClassification(input.classification),
     familyRole: nullableText(input.familyRole),
     friendDate: nullableDate(input.friendDate),
+    whatsappNumber: nullableText(input.whatsappNumber),
+    allowSms: input.allowSms ?? true,
+    allowBirthdaySms: input.allowBirthdaySms ?? true,
+    allowEventSms: input.allowEventSms ?? true,
+    allowWelfareSms: input.allowWelfareSms ?? true,
+    allowWhatsApp: input.allowWhatsApp ?? false,
+    allowBirthdayWhatsApp: input.allowBirthdayWhatsApp ?? false,
+    preferredCommunicationChannel: input.preferredCommunicationChannel ?? 'SMS',
+    doNotContact: input.doNotContact ?? false,
     notes: nullableText(input.notes),
   };
 }

@@ -9,6 +9,15 @@ export type PersonRecord = {
   phone?: string | null;
   mobilePhone?: string | null;
   dateOfBirth?: string | null;
+  whatsappNumber?: string | null;
+  allowSms?: boolean;
+  allowBirthdaySms?: boolean;
+  allowEventSms?: boolean;
+  allowWelfareSms?: boolean;
+  allowWhatsApp?: boolean;
+  allowBirthdayWhatsApp?: boolean;
+  preferredCommunicationChannel?: 'SMS' | 'WHATSAPP' | 'BOTH' | 'NONE';
+  doNotContact?: boolean;
   classification?: string | null;
   createdAt: string;
   deletedAt?: string | null;

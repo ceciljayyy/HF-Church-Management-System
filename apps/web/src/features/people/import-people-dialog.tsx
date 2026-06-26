@@ -22,12 +22,20 @@ const fields = [
   { key: 'classification', label: 'Classification' },
   { key: 'occupation', label: 'Occupation' },
   { key: 'membershipDate', label: 'Membership Date' },
+  { key: 'department', label: 'Department' },
+  { key: 'whatsappNumber', label: 'WhatsApp Number' },
+  { key: 'preferredCommunicationChannel', label: 'Preferred Communication Channel' },
+  { key: 'allowSms', label: 'Allow SMS' },
+  { key: 'allowBirthdaySms', label: 'Allow Birthday SMS' },
+  { key: 'allowWhatsApp', label: 'Allow WhatsApp' },
+  { key: 'allowBirthdayWhatsApp', label: 'Allow Birthday WhatsApp' },
+  { key: 'doNotContact', label: 'Do Not Contact' },
   { key: 'notes', label: 'Notes' },
 ];
 
 const sampleCsv = [
-  'First Name,Last Name,Gender,Phone,Email,Address,Classification,Membership Date,Date of Birth,Department,Notes',
-  'Ama,Boateng,Female,0240000001,ama@example.com,Dansoman,Member,2026-06-13,1995-04-02,Choir,Choir member',
+  'First Name,Last Name,Gender,Phone,Email,Address,Classification,Membership Date,Date of Birth,Department,WhatsApp Number,Preferred Communication Channel,Allow SMS,Allow Birthday SMS,Allow WhatsApp,Allow Birthday WhatsApp,Do Not Contact,Notes',
+  'Ama,Boateng,Female,0240000001,ama@example.com,Dansoman,Member,2026-06-13,1995-04-02,Choir,0240000001,SMS,Yes,Yes,No,No,No,Choir member',
 ].join('\n');
 
 type CsvRow = Record<string, string>;
@@ -85,7 +93,6 @@ function defaultMapping(headers: string[]) {
     dob: 'dateOfBirth',
     phone: 'phone',
     'mobile phone': 'phone',
-    'whatsapp number': 'phone',
     'email address': 'email',
     email: 'email',
     'home address': 'address',
@@ -96,6 +103,14 @@ function defaultMapping(headers: string[]) {
     occupation: 'occupation',
     'membership date': 'membershipDate',
     department: 'department',
+    'whatsapp number': 'whatsappNumber',
+    whatsapp: 'whatsappNumber',
+    'preferred communication channel': 'preferredCommunicationChannel',
+    'allow sms': 'allowSms',
+    'allow birthday sms': 'allowBirthdaySms',
+    'allow whatsapp': 'allowWhatsApp',
+    'allow birthday whatsapp': 'allowBirthdayWhatsApp',
+    'do not contact': 'doNotContact',
     notes: 'notes',
   };
 

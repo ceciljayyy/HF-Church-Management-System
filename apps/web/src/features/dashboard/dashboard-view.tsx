@@ -99,7 +99,7 @@ export function DashboardView() {
     async function loadBirthdays() {
       setBirthdaysLoading(true);
       try {
-        const payload = await apiClient.request<{ data: BirthdayItem[] }>('/people/birthdays?scope=thisMonth&limit=3');
+        const payload = await apiClient.request<{ data: BirthdayItem[] }>('/people/birthdays?filter=thisMonth&limit=3');
         if (mounted) setBirthdaysThisMonth(payload.data ?? []);
       } catch (err) {
         if (mounted) {
@@ -206,7 +206,7 @@ function initials(name: string) {
 function BirthdaysThisMonth({ birthdays, loading }: { birthdays: BirthdayItem[]; loading: boolean }) {
   return (
     <section>
-      <SectionHeader title="Birthdays This Month" href="/care/birthdays" />
+      <SectionHeader title="Birthdays This Month" href="/people/birthdays" />
       <div className="space-y-3">
         {loading ? (
           Array.from({ length: 3 }).map((_, index) => (
